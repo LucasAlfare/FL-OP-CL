@@ -1,117 +1,115 @@
-# FL Card Language (FCL) — Especificação 1.0.0
+# FL Card Language (FCL) — Specification 1.0.0
 
-**Documento normativo único:** `FL_CARD_LANGUAGE_SPEC_v1.0.0.md`  
-**Formato textual:** TOML 1.0.0  
-**Versão da linguagem e da semântica:** 1.0.0  
-**Data de congelamento:** 8 de novembro de 2026  
-**Status:** `FROZEN — READY FOR CARD-TRANSLATION TESTING`
+Single Normative Document: `FL_CARD_LANGUAGE_SPEC_v1.0.0.md`\
+Textual Format: TOML 1.0.0\
+Language and Semantic Version: 1.0.0\
+Freeze Date: November 8, 2026\
+Status: `FROZEN — READY FOR CARD-TRANSLATION TESTING`
 
----
+## 1. Purpose and Authority
 
-## 1. Objetivo e autoridade
+The FL Card Language (FCL) is a declarative language for describing One Piece Card Game card abilities and effects as data programs interpretable by a Rules Engine/VM.
 
-A **FL Card Language (FCL)** é uma linguagem declarativa para descrever habilidades e efeitos de cartas do One Piece Card Game como programas de dados interpretáveis por uma Rules Engine/VM.
+The card declares its specific behavior; the official rules define the procedures and consequences; the engine executes those procedures. FCL is not a general-purpose language. It does not contain Kotlin code, user-defined functions, callbacks, mutable variables, unrestricted loops, recursion, or arbitrary access to game state.
 
-A carta declara o comportamento particular; as regras oficiais determinam os procedimentos e consequências; o motor executa esses procedimentos. FCL não é uma linguagem de propósito geral, não contém código Kotlin, funções de usuário, callbacks, variáveis mutáveis, loops livres, recursão ou acesso arbitrário ao estado.
+Version 1.0.0 defines, in a single document, the canonical TOML format, the closed semantic profile, vocabularies, Replacement Effect structure, validation rules, and blocking policy. This document supersedes any previous specification, semantic contract, or addendum for FCL 1.0.0. No external document needs to be combined with it.
 
-A versão 1.0.0 define, em um único documento, o formato TOML canônico, o perfil semântico fechado, os vocabulários, a estrutura de Replacement Effects, as regras de validação e a política de bloqueio. **Este documento substitui, para FCL 1.0.0, qualquer especificação, contrato semântico ou adendo anterior.** Não há documento externo que precise ser combinado com ele.
+The external lexical and syntactic grammar is TOML 1.0.0. FCL adds a closed profile of tables, fields, types, enumerations, and semantic invariants. `language_version = "1.0.0"` identifies both the structure and the meaning of the constructs. There is no separate semantic-profile field.
 
-A gramática lexical e sintática externa é TOML 1.0.0. FCL acrescenta um perfil fechado de tabelas, campos, tipos, enumerações e invariantes semânticos. `language_version = "1.0.0"` identifica tanto a estrutura quanto o significado das construções. Não existe um campo independente de perfil semântico.
+`FROZEN` means that the contract for this version is closed and ready for card translation and testing to begin. It does not mean that every published card is supported, that the compiler/VM already exists, or that every game interaction has been implemented. Any behavior outside this profile must be blocked rather than approximated. Structural or semantic changes require a new version.
 
-`FROZEN` significa que o contrato desta versão está fechado para iniciar traduções e testes de cartas. Não significa que toda carta publicada seja suportada, que o compilador/VM já exista ou que toda interação do jogo tenha sido implementada. Qualquer comportamento fora deste perfil deve ser bloqueado, não aproximado. Mudanças de estrutura ou semântica exigem nova versão.
+## 2. Scope and Responsibility Boundaries
 
-## 2. Escopo e fronteira de responsabilidade
+The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (August 28, 2026), together with the currently applicable official card text, errata, and FAQs. Official sources and the audit boundary are listed at the end of this document.
 
-A base normativa é o *ONE PIECE CARD GAME Comprehensive Rules* v1.2.1 (28/08/2026), em conjunto com o texto oficial vigente, erratas e FAQs diretamente aplicáveis. As fontes oficiais e o limite de auditoria estão no fim deste documento.
+### 2.1 Included
 
-### 2.1 Incluído
+- printed game identity and separately maintained editorial data;
+- Auto, Activate, Permanent, and Replacement Effects;
+- recognized Keyword Effects and their official procedures;
+- activation, validity, and resolution conditions, filters, and predicates;
+- selections, quantities, mode choices, and information;
+- activation costs and supported payments;
+- ordered resolution, dependencies, optional choices, simultaneity, and finite repetition;
+- game operations enumerated in this profile;
+- continuous effects, scope, validity, and duration;
+- source references, traceability, and translation blocking.
 
-- identidade de jogo impressa e dados editoriais separados;
-- Auto, Activate, Permanent e Replacement Effects;
-- Keyword Effects reconhecidos e seus procedimentos oficiais;
-- condições de ativação/validade/resolução, filtros e predicados;
-- seleções, quantidades, escolhas de modo e informação;
-- custos de ativação e pagamentos admitidos;
-- resolução ordenada, dependências, escolhas opcionais, simultaneidade e repetição finita;
-- operações de jogo enumeradas neste perfil;
-- efeitos contínuos, escopo, validade e duração;
-- referência à origem, rastreabilidade e bloqueios de tradução.
+### 2.2 Excluded
 
-### 2.2 Excluído
+- complete rules for turns, phases, battles, Blocker, Counter, damage, Life, Trigger, K.O., priority, `rule processing`, defeat, and general loops;
+- implementation of Rules Engine/VM procedures, bytecode, and binary layout;
+- format legality, banlists, and deck construction;
+- operations, conditions, timings, durations, or properties not enumerated in this document;
+- arbitrary behavior, card-specific code, or instructions exclusive to a particular card.
 
-- regras completas de turno, fases, batalha, Blocker, Counter, dano, Life, Trigger, K.O., prioridade, `rule processing`, derrota e loops gerais;
-- implementação de procedimentos da Rules Engine/VM, bytecode e layout binário;
-- legalidade de formatos, banlists e construção de deck;
-- operações, condições, timings, durações ou propriedades que não estejam enumerados neste documento;
-- comportamento arbitrário, código por carta ou uma instrução exclusiva para uma carta.
+Deck construction restrictions and effects that modify deck construction rules are outside the FCL 1.0.0 gameplay program. Editorial legality data may be stored outside executable instructions.
 
-Restrições de construção de deck e efeitos que alterem regras de deck construction ficam fora do programa de gameplay FCL 1.0.0. Dados editoriais de legalidade podem ser armazenados fora das instruções executáveis.
+### 2.3 Mandatory Semantic Principles
 
-### 2.3 Princípios semânticos obrigatórios
+1. Category and duration are different dimensions. The four categories are `AUTO`, `ACTIVATE`, `PERMANENT`, and `REPLACEMENT`. `ONE_SHOT` and `CONTINUOUS` describe the temporal form of an effect, not a fifth category. Permanent Effect is a category; Continuous Effect is a duration/consequence form.
+2. Activation, cost, choice, selection, and resolution are distinct. The timing at which an event occurs, eligibility, activation, payment, mode choice, object selection, and resolution must not be conflated.
+3. Impossibility is not a universal failure state. An unsatisfied condition, impossible cost, impossible action, missing target, empty selection, `up to 0` choice, declined replacement, and invalidated effect are different situations. There is no universal rollback, atomicity, or continuation rule.
+4. Do not infer equivalence. K.O. is not Trash; damage is not movement from Life; drawing is not selecting from the Deck; playing a card is not moving it to the Field; Trigger is not any movement involving Life; effective Power is not base Power; effective Cost is not base Cost; owner is not controller; chooser is not executor.
+5. Syntax does not create semantics. When the text/rules/FAQ do not determine the subject, object, player, timing, quantity, order, cost, scope, or consequence, translation must be blocked.
+6. The card does not reimplement the engine. Priority, phases, battle, damage processing, K.O., Trigger, permanent-effect stabilization, information rules, competing replacements, and loops are engine procedures.
 
-1. **Categoria e duração são dimensões diferentes.** As quatro categorias são `AUTO`, `ACTIVATE`, `PERMANENT` e `REPLACEMENT`. `ONE_SHOT` e `CONTINUOUS` descrevem a forma temporal do efeito, não uma quinta categoria. Permanent Effect é uma categoria; Continuous Effect é uma duração/forma de consequência.
-2. **Ativação, custo, escolha, seleção e resolução são diferentes.** O momento em que um timing ocorre, a elegibilidade, a ativação, o pagamento, a escolha de modo, a seleção de objetos e a resolução não podem ser fundidos.
-3. **Impossibilidade não é falha universal.** Condição não satisfeita, custo impossível, ação impossível, alvo ausente, seleção vazia, escolha `up to 0`, substituição recusada e efeito invalidado são situações diferentes. Não existe rollback, atomicidade ou continuidade universal.
-4. **Não inferir equivalência.** K.O. não é Trash; dano não é movimento de Life; compra não é selecionar do Deck; jogar carta não é mover para o Field; Trigger não é qualquer movimento de Life; Power efetivo não é base Power; Cost efetivo não é base Cost; owner não é controller; escolhedor não é executor.
-5. **Nenhuma semântica é criada pela sintaxe.** Quando texto/regra/FAQ não determinar sujeito, objeto, jogador, momento, quantidade, ordem, custo, escopo ou consequência, a tradução é bloqueada.
-6. **A carta não reimplementa o motor.** Prioridade, fases, batalha, processamento de dano, K.O., Trigger, estabilização de permanentes, regras de informação, substituições concorrentes e loops são procedimentos do motor.
+A structurally valid TOML document may still be semantically incorrect. `SUPPORTED` requires structural validation and normative justification, not merely successful parsing.
 
-Uma estrutura TOML válida pode continuar semanticamente incorreta. O status `SUPPORTED` exige validação estrutural e fundamento normativo, não apenas parsing.
+## 3. Authoring Unit and External Organization
 
-## 3. Unidade de autoria e organização externa
+### 3.1 One Logical Unit per Card
 
-### 3.1 Uma unidade lógica por carta
+The canonical authoring unit is one TOML file per logical card identity (`card number`). Artwork variations and printings do not duplicate programs when they share the same identity and gameplay text/rules.
 
-A unidade canônica de autoria é um arquivo TOML por identidade lógica de carta (`card number`). Variações de arte e printings não duplicam programas quando compartilham a mesma identidade e o mesmo texto/regra de jogo.
+A card unit has five conceptual sections, all within the same TOML document:
 
-Uma unidade de carta possui cinco áreas conceituais, todas no mesmo documento TOML:
+1. game identity (`[card]`);
+2. abilities and programs (`[[abilities]]` and descendant structures);
+3. normative sources (`[source]` and descendant structures);
+4. translation results and blockers (`[translation]`);
+5. editorial metadata and printings (`[editorial]`).
 
-1. identidade de jogo (`[card]`);
-2. habilidades e programas (`[[abilities]]` e estruturas descendentes);
-3. fonte normativa (`[source]` e estruturas descendentes);
-4. resultado de tradução e bloqueios (`[translation]`);
-5. metadados editoriais e printings (`[editorial]`).
+This separation is semantic and structural. It does not require physically separate files.
 
-A separação é semântica e estrutural. Ela não exige arquivos físicos separados.
+### 3.2 Non-Instructions
 
-### 3.2 Dados que não são instruções
+Game identity, provenance, and editorial data are not executable instructions. The compiler validates and classifies them separately.
 
-Identidade de jogo, proveniência e dados editoriais não são instruções executáveis. O compilador os valida e os classifica separadamente.
+Editorial metadata must not be sent to the VM as instructions. Normative source information is required for auditing but does not need to be included in the binary execution catalog.
 
-Metadados editoriais não devem ser enviados à VM como instruções. A fonte normativa é necessária para auditoria, mas não precisa integrar o catálogo binário de execução.
+## 4. Mandatory TOML Rules
 
-## 4. Regras TOML obrigatórias
+The implementation must accept TOML 1.0.0 and reject extensions from later versions.
 
-A implementação deve aceitar TOML 1.0.0 e rejeitar extensões de versões posteriores.
+| Rule           | Requirement                                                                  |
+| -------------- | ---------------------------------------------------------------------------- |
+| Encoding       | UTF-8                                                                        |
+| Keys           | `snake_case`, case-sensitive                                                 |
+| Enumerations   | Strings in `UPPER_SNAKE_CASE`                                                |
+| Local IDs      | Stable strings, unique within their defined scope                            |
+| Arrays         | Order is significant when representing sequences, alternatives, or printings |
+| Tables         | Physical table/key order has no semantic meaning                             |
+| Missing values | Omit inapplicable keys; TOML does not use `null`                             |
+| Unknown keys   | Reject                                                                       |
+| Duplicate keys | Reject through the TOML parser                                               |
+| Dates          | ISO `YYYY-MM-DD` strings, not TOML datetime values                           |
+| Game numbers   | Decimal integers, unless the textual type requires a string                  |
+| Comments       | Allowed, with no gameplay meaning                                            |
 
-| Regra | Exigência |
-|---|---|
-| Codificação | UTF-8 |
-| Chaves | `snake_case`, sensíveis a maiúsculas/minúsculas |
-| Enumerações | Strings em `UPPER_SNAKE_CASE` |
-| IDs locais | Strings estáveis, únicas no escopo definido |
-| Arrays | Ordem significativa quando representam sequência, alternativas ou printings |
-| Tabelas | Ordem física das tabelas/chaves não possui significado semântico |
-| Valores ausentes | Omitir chave não aplicável; TOML não usa `null` |
-| Chaves desconhecidas | Rejeitar |
-| Chaves duplicadas | Rejeitar pelo parser TOML |
-| Datas | Strings ISO `YYYY-MM-DD`, não valores datetime TOML |
-| Números de jogo | Inteiros decimais, salvo quando o tipo textual exigir string |
-| Comentários | Permitidos, sem significado de jogo |
+Do not use YAML anchors, aliases, custom tags, or other YAML features. Do not use free-form text strings as substitutes for required semantic structures.
 
-Não usar anchors, aliases, tags customizadas ou recursos de YAML. Não usar uma string de texto livre para substituir estrutura semântica exigida.
+### 4.1 Ordering
 
-### 4.1 Ordem
+Resolution order must be represented in TOML arrays, never by the physical order of tables or properties. Condition arrays represent conjunction only when the field containing them explicitly defines that semantics; in all other contexts, interpretation is determined by the field's type.
 
-A ordem de resolução deve estar em arrays TOML, nunca na ordem física de tabelas ou propriedades. Arrays de condições representam conjunção somente quando o campo que os contém declara explicitamente essa semântica; nos demais contextos, a interpretação é definida pelo tipo do campo.
+### 4.2 Inline Tables
 
-### 4.2 Inline tables
+Inline tables are used for references, dynamic values, conditions, and compact nodes in nested structures. Each inline table must follow TOML 1.0.0 syntax. Extensive resolution structures may be organized as arrays of tables (`[[...]]`).
 
-Inline tables são usadas para referências, valores dinâmicos, condições e nós compactos de estruturas aninhadas. Cada inline table segue a sintaxe TOML 1.0.0. Estruturas de resolução extensas podem ser organizadas como arrays de tabelas (`[[...]]`).
+## 5. Top-Level Structure
 
-## 5. Estrutura de topo
-
-As únicas chaves/tabelas de topo permitidas são:
+The only permitted top-level keys/tables are:
 
 - `format`;
 - `language_version`;
@@ -121,9 +119,9 @@ As únicas chaves/tabelas de topo permitidas são:
 - `[editorial]`;
 - `[[abilities]]`.
 
-Exemplo estrutural mínimo:
+Minimal structural example:
 
-```toml
+```
 format = "FL_CARD_LANGUAGE"
 language_version = "1.0.0"
 
@@ -150,26 +148,26 @@ source_text = "..."
 status = "SUPPORTED"
 ```
 
-O exemplo é estrutural. Campos obrigatórios, aplicabilidade e vocabulários são especificados nas seções seguintes.
+This is a structural example. Required fields, applicability, and vocabularies are specified in the following sections.
 
-## 6. Identidade de jogo — `[card]`
+## 6. Game Identity — `[card]`
 
-Campos permitidos:
+Permitted fields:
 
-| Campo | Tipo | Regra |
-|---|---|---|
-| `number` | string | Obrigatório; card number oficial |
-| `name` | string | Obrigatório |
-| `category` | enum | Obrigatório: `LEADER`, `CHARACTER`, `EVENT`, `STAGE`, `DON` |
-| `colors` | array de enums | Obrigatório; uma ou mais cores impressas |
-| `types` | array de strings | Tipos impressos; vazio somente se oficialmente sem tipo |
-| `attributes` | array de enums | Aplicável somente a Leader/Character |
-| `cost` | integer | Aplicável a Character/Event/Stage |
-| `power` | integer | Aplicável a Leader/Character |
-| `life` | integer | Aplicável a Leader |
-| `counter` | integer | Aplicável a Character |
+| Field        | Type         | Rule                                                     |
+| ------------ | ------------ | -------------------------------------------------------- |
+| `number`     | string       | Required; official card number                           |
+| `name`       | string       | Required                                                 |
+| `category`   | enum         | Required: `LEADER`, `CHARACTER`, `EVENT`, `STAGE`, `DON` |
+| `colors`     | enum array   | Required; one or more printed colors                     |
+| `types`      | string array | Printed types; empty only if officially typeless         |
+| `attributes` | enum array   | Applicable only to Leader/Character                      |
+| `cost`       | integer      | Applicable to Character/Event/Stage                      |
+| `power`      | integer      | Applicable to Leader/Character                           |
+| `life`       | integer      | Applicable to Leader                                     |
+| `counter`    | integer      | Applicable to Character                                  |
 
-### 6.1 Enumerações
+### 6.1 Enumerations
 
 `category`: `LEADER`, `CHARACTER`, `EVENT`, `STAGE`, `DON`.
 
@@ -177,36 +175,36 @@ Campos permitidos:
 
 `attributes`: `SLASH`, `STRIKE`, `RANGED`, `SPECIAL`, `WISDOM`, `QUESTION_MARK`.
 
-`types` são dados literais impressos, não enumerações fechadas da linguagem. Preservar grafia e conteúdo oficiais usados pela fonte escolhida.
+`types` are literal printed data, not closed language enumerations. Preserve the spelling and official content used by the selected source.
 
-### 6.2 Aplicabilidade
+### 6.2 Applicability
 
-- `life` só pode existir para `LEADER`.
-- `power` só pode existir para `LEADER` e `CHARACTER`.
-- `counter` só pode existir para `CHARACTER`.
-- `cost` só pode existir para `CHARACTER`, `EVENT` e `STAGE`.
-- `attributes` só pode existir para `LEADER` e `CHARACTER`.
-- Não preencher campo não aplicável com zero ou string vazia.
+- `life` may exist only for `LEADER`.
+- `power` may exist only for `LEADER` and `CHARACTER`.
+- `counter` may exist only for `CHARACTER`.
+- `cost` may exist only for `CHARACTER`, `EVENT`, and `STAGE`.
+- `attributes` may exist only for `LEADER` and `CHARACTER`.
+- Do not populate inapplicable fields with zero or empty strings.
 
-A ausência de campo não aplicável é diferente de valor numérico zero.
+The absence of an inapplicable field is different from a numeric value of zero.
 
-## 7. Fonte normativa — `[source]`
+## 7. Normative Sources — `[source]`
 
-Campos obrigatórios: `raw_text`, `current_text`, `language` e `region`. `edition` é opcional. `raw_text` preserva a origem recebida; `current_text` contém o texto oficial vigente realmente traduzido. Errata aplicável deve estar refletida em `current_text`; `raw_text` nunca é autoridade quando diverge da fonte vigente.
+Required fields: `raw_text`, `current_text`, `language`, and `region`. `edition` is optional. `raw_text` preserves the source as received; `current_text` contains the actual current official text being translated. Applicable errata must be reflected in `current_text`; `raw_text` is never authoritative when it differs from the currently applicable official source.
 
-Todas as fontes usadas na interpretação — Comprehensive Rules, FAQ, errata e texto oficial da carta — ficam em uma única lista `[[source.references]]`. Não há uma segunda tabela de erratas.
+All sources used in interpretation — Comprehensive Rules, FAQs, errata, and official card text — belong in a single `[[source.references]]` list. There is no separate errata table.
 
-| Campo | Tipo | Regra |
-|---|---|---|
-| `id` | string | Obrigatório, único no arquivo |
-| `kind` | enum | `CR`, `FAQ`, `ERRATA` ou `OFFICIAL_CARD_TEXT` |
-| `document` | string | Obrigatório; nome identificável da fonte |
-| `url` | string | Obrigatório; URL oficial |
-| `version` | string | Opcional; versão/edição da fonte |
-| `section` | string | Opcional; seção/regra/pergunta relevante |
-| `date` | string | Opcional; data ISO `YYYY-MM-DD`, especialmente para errata/FAQ |
+| Field      | Type   | Rule                                                        |
+| ---------- | ------ | ----------------------------------------------------------- |
+| `id`       | string | Required; unique within the file                            |
+| `kind`     | enum   | `CR`, `FAQ`, `ERRATA`, or `OFFICIAL_CARD_TEXT`              |
+| `document` | string | Required; identifiable source name                          |
+| `url`      | string | Required; official URL                                      |
+| `version`  | string | Optional; source version/edition                            |
+| `section`  | string | Optional; relevant section/rule/question                    |
+| `date`     | string | Optional; ISO `YYYY-MM-DD` date, especially for errata/FAQs |
 
-```toml
+```
 [[source.references]]
 id = "CR-8-1-3-4"
 kind = "CR"
@@ -224,26 +222,26 @@ date = "2026-11-06"
 url = "https://en.onepiece-cardgame.com/pdf/qa_eb05.pdf?20261106="
 ```
 
-`source_refs`, `replacement.target.rule_ref` e `translation.blockers.references` apontam para IDs existentes nesta lista. Uma FAQ só fundamenta o caso que respondeu; não generalizar seu resultado.
+`source_refs`, `replacement.target.rule_ref`, and `translation.blockers.references` must point to existing IDs in this list. An FAQ only establishes the case it addresses; its outcome must not be generalized.
 
-## 8. Resultado da tradução — `[translation]`
+## 8. Translation Result — `[translation]`
 
-`[translation]` contém `status` (obrigatório) e `notes` (opcional, sem semântica executável). `status` aceita `SUPPORTED`, `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE` ou `NON_GAME_TEXT`.
+`[translation]` contains `status` (required) and `notes` (optional, with no executable semantics). `status` accepts `SUPPORTED`, `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE`, or `NON_GAME_TEXT`.
 
-Bloqueios usam `[[translation.blockers]]`:
+Blockers use `[[translation.blockers]]`:
 
-| Campo | Tipo | Obrigatoriedade |
-|---|---|---|
-| `code` | enum | Obrigatório: `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY` ou `INVALID_SOURCE` |
-| `scope` | enum | Obrigatório: `CARD`, `ABILITY` ou `EFFECT` |
-| `ability_id` | string | Obrigatório para `ABILITY`/`EFFECT`; proibido para `CARD` |
-| `effect_id` | string | Obrigatório somente para `EFFECT`; proibido nos demais |
-| `source_excerpt` | string | Obrigatório; trecho literal de `current_text` |
-| `reason` | string | Obrigatório; lacuna objetiva |
-| `references` | array de strings | Opcional; IDs de `[source.references]` |
+| Field            | Type         | Requirement                                                              |
+| ---------------- | ------------ | ------------------------------------------------------------------------ |
+| `code`           | enum         | Required: `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, or `INVALID_SOURCE` |
+| `scope`          | enum         | Required: `CARD`, `ABILITY`, or `EFFECT`                                 |
+| `ability_id`     | string       | Required for `ABILITY`/`EFFECT`; forbidden for `CARD`                    |
+| `effect_id`      | string       | Required only for `EFFECT`; forbidden otherwise                          |
+| `source_excerpt` | string       | Required; literal excerpt from `current_text`                            |
+| `reason`         | string       | Required; objective description of the gap                               |
+| `references`     | string array | Optional; IDs from `[source.references]`                                 |
 
-```toml
-# Fragmento: pressupõe [source.references] com o ID usado em references.
+```
+# Fragment: assumes [source.references] contains the ID used in references.
 [translation]
 status = "BLOCKED_CAPABILITY"
 
@@ -252,31 +250,31 @@ code = "BLOCKED_CAPABILITY"
 scope = "ABILITY"
 ability_id = "A2"
 source_excerpt = "..."
-reason = "O texto exige uma operação não definida no perfil 1.0.0."
+reason = "The text requires an operation not defined in the 1.0.0 profile."
 references = ["CR-8-1-3-4"]
 ```
 
-### 8.1 Consistência
+### 8.1 Consistency
 
-- Somente `SUPPORTED` pode ser compilado para gameplay.
-- Qualquer habilidade de jogo bloqueada bloqueia a carta inteira; não compilar parcialmente.
-- A prioridade de status é `INVALID_SOURCE` > `BLOCKED_NORMATIVE` > `BLOCKED_CAPABILITY` > `SUPPORTED`.
-- Uma habilidade `SUPPORTED` deve estar integralmente representada; `NON_GAME_TEXT` não contém instrução executável.
-- `translation.status = "NON_GAME_TEXT"` somente quando não há habilidade de gameplay traduzível (inclusive carta sem habilidade).
-- `SUPPORTED` e `NON_GAME_TEXT` não podem ter blockers. Estados `BLOCKED_*` e `INVALID_SOURCE` exigem ao menos um blocker.
-- Se existir ao menos uma habilidade de gameplay, `translation.status` é o status de maior severidade entre as habilidades de gameplay e os blockers de escopo `CARD`: `INVALID_SOURCE` > `BLOCKED_NORMATIVE` > `BLOCKED_CAPABILITY` > `SUPPORTED`. Habilidades `NON_GAME_TEXT` não entram nessa comparação. Use `translation.status = "NON_GAME_TEXT"` somente quando a carta não possuir habilidade de gameplay.
-- Todo blocker deve corresponder a uma habilidade/efeito existente quando o escopo for `ABILITY`/`EFFECT`; status e blockers devem concordar.
-- `notes` não substitui `reason` nem altera a execução.
+- Only `SUPPORTED` may be compiled into gameplay.
+- Any blocked gameplay ability blocks the entire card; do not partially compile it.
+- Status precedence is `INVALID_SOURCE` > `BLOCKED_NORMATIVE` > `BLOCKED_CAPABILITY` > `SUPPORTED`.
+- A `SUPPORTED` ability must be fully represented; `NON_GAME_TEXT` contains no executable instructions.
+- `translation.status = "NON_GAME_TEXT"` is used only when there are no translatable gameplay abilities (including cards with no abilities).
+- `SUPPORTED` and `NON_GAME_TEXT` must not have blockers. `BLOCKED_*` and `INVALID_SOURCE` states require at least one blocker.
+- If at least one gameplay ability exists, `translation.status` must be the highest-severity status among gameplay abilities and card-scope blockers: `INVALID_SOURCE` > `BLOCKED_NORMATIVE` > `BLOCKED_CAPABILITY` > `SUPPORTED`. `NON_GAME_TEXT` abilities are excluded from this comparison. Use `translation.status = "NON_GAME_TEXT"` only when the card has no gameplay abilities.
+- Every blocker must correspond to an existing ability/effect when its scope is `ABILITY`/`EFFECT`; statuses and blockers must agree.
+- `notes` does not replace `reason` or alter execution.
 
-## 9. Metadados editoriais — `[editorial]`
+## 9. Editorial Metadata — `[editorial]`
 
-`[editorial]` é opcional e nunca é enviado à VM. Campos permitidos: `rarity`, `set_id`, `set_name`, `illustrator`, `thumbnail_url`, `rights`, `block_number`; `[[editorial.printings]]`; e `[editorial.extra]`.
+`[editorial]` is optional and is never sent to the VM. Permitted fields: `rarity`, `set_id`, `set_name`, `illustrator`, `thumbnail_url`, `rights`, `block_number`; `[[editorial.printings]]`; and `[editorial.extra]`.
 
-Cada printing aceita somente `set_id`, `rarity`, `art_id`, `illustrator`, `thumbnail_role`, `thumbnail_url` e `rights`. `thumbnail_role`: `SAMPLE`, `CUSTOM` ou `FINAL`. `rights` é anotação, não licença.
+Each printing accepts only `set_id`, `rarity`, `art_id`, `illustrator`, `thumbnail_role`, `thumbnail_url`, and `rights`. `thumbnail_role`: `SAMPLE`, `CUSTOM`, or `FINAL`. `rights` is an annotation, not a license.
 
-`[editorial.extra]` é a única área extensível: aceita valores escalares TOML (`string`, `integer`, `float`, `boolean`) e arrays homogêneos desses escalares. Não aceita tabelas, arrays de tabelas ou dados executáveis. Todas as demais chaves desconhecidas são rejeitadas.
+`[editorial.extra]` is the only extensible area: it accepts TOML scalar values (`string`, `integer`, `float`, `boolean`) and homogeneous arrays of those scalars. It does not accept tables, arrays of tables, or executable data. All other unknown keys are rejected.
 
-```toml
+```
 [[editorial.printings]]
 set_id = "OP-01"
 rarity = "L"
@@ -291,220 +289,226 @@ source_api = "optcgapi"
 collector_note = "Alternate art"
 ```
 
-Variações de arte/printing não duplicam o programa quando compartilham identidade lógica e texto de jogo vigente.
+Artwork/printing variations do not duplicate the program when they share the same logical identity and current gameplay text.
 
-## 10. Habilidades — `[[abilities]]`
+## 10. Abilities — `[[abilities]]`
 
-Cada `[[abilities]]` representa uma unidade lógica do texto de jogo. Campos:
+Each `[[abilities]]` represents one logical unit of gameplay text. Fields:
 
-- `id`: obrigatório e único dentro da carta;
-- `source_text`: obrigatório; trecho exato do texto oficial vigente correspondente à habilidade;
-- `status`: obrigatório; `SUPPORTED`, `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE` ou `NON_GAME_TEXT`;
-- `source_refs`: opcional; IDs de `[source.references]` que fundamentam a interpretação;
-- `keyword_effects`: opcional; Keyword Effects presentes e reconhecidos;
-- `event_activation`: opcional; modo de ativação da carta Event, distinto da categoria do efeito;
-- `effects`: zero ou mais declarações em `[[abilities.effects]]`.
+- `id`: required and unique within the card;
+- `source_text`: required; exact excerpt of the current official text corresponding to the ability;
+- `status`: required; `SUPPORTED`, `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE`, or `NON_GAME_TEXT`;
+- `source_refs`: optional; IDs from `[source.references]` supporting the interpretation;
+- `keyword_effects`: optional; recognized Keyword Effects present on the card;
+- `event_activation`: optional; activation mode for an Event card, distinct from the effect category;
+- `effects`: zero or more declarations in `[[abilities.effects]]`.
 
-Uma habilidade `SUPPORTED` precisa estar integralmente representada por `effects`, `keyword_effects` ou `event_activation`. `NON_GAME_TEXT` não pode conter instruções executáveis. Uma habilidade bloqueada pode preservar a parte compreendida, mas bloqueia a carta inteira e exige blocker correspondente.
+A `SUPPORTED` ability must be fully represented by `effects`, `keyword_effects`, or `event_activation`. `NON_GAME_TEXT` must not contain executable instructions. A blocked ability may preserve the portion that was understood, but it blocks the entire card and requires a corresponding blocker.
 
-Não fundir habilidades distintas nem dividir uma habilidade quando isso alterar custo, timing, condição, escolha, ordem ou dependência.
+Do not merge distinct abilities or split an ability in a way that changes its cost, timing, condition, choice, order, or dependency.
 
 ### 10.1 Keyword Effects
 
-`keyword_effects` aceita somente `RUSH`, `DOUBLE_ATTACK`, `BANISH`, `BLOCKER`, `TRIGGER`, `RUSH_CHARACTER` e `UNBLOCKABLE`. Cada termo aciona o procedimento oficial do motor; FCL não reimplementa esse procedimento.
+`keyword_effects` accepts only `RUSH`, `DOUBLE_ATTACK`, `BANISH`, `BLOCKER`, `TRIGGER`, `RUSH_CHARACTER`, and `UNBLOCKABLE`. Each term invokes the engine's official procedure; FCL does not reimplement that procedure.
 
-A ocorrência de `TRIGGER` deve corresponder exatamente a uma representação: (a) em carta não-Event, `keyword_effects = ["TRIGGER"]` mais `AUTO/timing = "TRIGGER"`; (b) em Event com texto `[Trigger] Activate this card.`, `keyword_effects = ["TRIGGER"]` mais `event_activation.window = "TRIGGER"`. Não declarar ambas na mesma ocorrência nem registrar apenas a keyword.
+A `TRIGGER` occurrence must correspond to exactly one representation:
 
-Outros Keywords não são armazenados como uma lista indiferenciada. São representados em sua função semântica: timing, condição, custo, limite, operação ou restrição.
+(a) For a non-Event card, `keyword_effects = ["TRIGGER"]` together with `AUTO/timing = "TRIGGER"`.
 
-### 10.2 Event card activation
+(b) For an Event card with the text `[Trigger] Activate this card.`, `keyword_effects = ["TRIGGER"]` together with `event_activation.window = "TRIGGER"`.
 
-`event_activation` descreve a autorização/procedimento de ativar a carta Event, não o Activation Cost nem uma operação de movimento. Formato:
+Do not declare both for the same occurrence, and do not register only the keyword.
 
-```toml
+Other Keywords are not stored in an undifferentiated list. They are represented according to their semantic role: timing, condition, cost, limit, operation, or restriction.
+
+### 10.2 Event Card Activation
+
+`event_activation` describes the authorization/procedure for activating an Event card, not its Activation Cost or a movement operation. Format:
+
+```
 event_activation = { window = "MAIN" }
 ```
 
-`window` aceita `MAIN`, `COUNTER` ou `TRIGGER`. `TRIGGER` só é usado quando o texto `[Trigger]` da Event diz para ativar a própria carta. Se o Trigger contém um efeito próprio (e não “Activate this card”), esse efeito é representado como `AUTO` com `timing = "TRIGGER"`, não como `event_activation.window = "TRIGGER"`.
+`window` accepts `MAIN`, `COUNTER`, or `TRIGGER`. `TRIGGER` is used only when the Event's `[Trigger]` text instructs the player to activate the card itself. If the Trigger contains its own effect (rather than “Activate this card”), that effect is represented as `AUTO` with `timing = "TRIGGER"`, not as `event_activation.window = "TRIGGER"`.
 
-A janela e o procedimento de ativação da Event pertencem ao motor. O efeito normal da Event é declarado separadamente como `ACTIVATE` com `activation_window = "EVENT_CARD_RESOLUTION"`. A ativação da carta Event não pode ser confundida com a ativação de uma habilidade de outra carta.
+The Event activation window and procedure belong to the engine. The Event's normal effect is declared separately as `ACTIVATE` with `activation_window = "EVENT_CARD_RESOLUTION"`. Activating an Event card must not be confused with activating an ability of another card.
 
-## 11. Declaração de efeitos — `[[abilities.effects]]`
+## 11. Effect Declarations — `[[abilities.effects]]`
 
-Cada `[[abilities.effects]]` possui:
+Each `[[abilities.effects]]` contains:
 
-- `id`: obrigatório e único dentro da habilidade;
-- `category`: obrigatório: `AUTO`, `ACTIVATE`, `PERMANENT` ou `REPLACEMENT`;
-- `source_refs`: opcional; IDs de fontes normativas relevantes;
-- os campos próprios da categoria.
+- `id`: required and unique within the ability;
+- `category`: required: `AUTO`, `ACTIVATE`, `PERMANENT`, or `REPLACEMENT`;
+- `source_refs`: optional; IDs of relevant normative sources;
+- the fields specific to its category.
 
-A categoria é normativa e não é inferida pelo nome da operação. Uma classificação incerta bloqueia a tradução.
+The category is normative and must not be inferred from the operation name. Uncertain classification blocks translation.
 
 ### 11.1 Auto Effect
 
-Campos:
+Fields:
 
-- `timing`: obrigatório;
-- `activation_conditions`: opcional; uma expressão Condition;
-- `activation_costs`: opcional; array ordenado;
-- `usage_limit`: opcional;
-- `effect_form`: obrigatório: `ONE_SHOT` ou `CONTINUOUS`;
-- `resolution`: obrigatório quando `ONE_SHOT`;
-- `continuous`: obrigatório quando `CONTINUOUS`.
+- `timing`: required;
+- `activation_conditions`: optional; one Condition expression;
+- `activation_costs`: optional; ordered array;
+- `usage_limit`: optional;
+- `effect_form`: required: `ONE_SHOT` or `CONTINUOUS`;
+- `resolution`: required when `ONE_SHOT`;
+- `continuous`: required when `CONTINUOUS`.
 
-Timings admitidos: `ON_PLAY`, `ON_KO`, `WHEN_ATTACKING`, `ON_OPPONENT_ATTACK`, `ON_BLOCK`, `TRIGGER`, `START_OF_GAME`, `START_OF_TURN`, `START_OF_MAIN_PHASE`, `END_OF_YOUR_TURN` e `END_OF_OPPONENT_TURN`.
+Supported timings: `ON_PLAY`, `ON_KO`, `WHEN_ATTACKING`, `ON_OPPONENT_ATTACK`, `ON_BLOCK`, `TRIGGER`, `START_OF_GAME`, `START_OF_TURN`, `START_OF_MAIN_PHASE`, `END_OF_YOUR_TURN`, and `END_OF_OPPONENT_TURN`.
 
-`TRIGGER` é uma janela específica do processamento de dano de Life. Quando uma carta com Trigger seria adicionada à mão a partir da Life nesse procedimento, o motor oferece ao jogador a opção de ativá-lo em vez de adicioná-la à mão. Se aceitar, a instrução declarada resolve pelo procedimento de Trigger; se recusar, o processamento normal continua. Se um efeito ou Replacement Effect impedir que a carta seja adicionada à mão, o Trigger não pode ser ativado (CR 4-6-3-1). Isso não é um passo `OPTIONAL` dentro da resolução.
+`TRIGGER` is a specific window within Life damage processing. When a card with Trigger would be added to its owner's hand from Life during this procedure, the engine offers the player the option to activate it instead of adding it to their hand. If accepted, the declared instruction resolves through the Trigger procedure; if declined, normal processing continues. If an effect or Replacement Effect prevents the card from being added to the hand, Trigger cannot be activated (CR 4-6-3-1). This is not an `OPTIONAL` step within resolution.
 
-`START_OF_GAME` só é aceito quando o procedimento oficial de início de jogo dá suporte ao caso. Se o evento de timing ocorreu, mas a carta-fonte saiu da área antes de o Auto Effect poder ser ativado, o efeito não ativa (CR 8-1-3-1-3).
+`START_OF_GAME` is accepted only when the official game-start procedure supports the case. If the timing event occurred but the source card left its area before the Auto Effect could be activated, the effect does not activate (CR 8-1-3-1-3).
 
-`[On K.O.]` é especial: o motor identifica o K.O. no Field, processa o timing e a ativação conforme o CR, move a carta para a Trash no momento regulamentar e resolve o efeito com a origem na área então aplicável. K.O. não pode ser substituído por Trash genérico.
+`[On K.O.]` is special: the engine identifies the K.O. on the Field, processes the timing and activation according to the CR, moves the card to the Trash at the prescribed point, and resolves the effect with its source in the area applicable at that time. K.O. must not be replaced with generic Trash.
 
 ### 11.2 Activate Effect
 
-Campos:
+Fields:
 
-- `activation_window`: obrigatório;
-- `activation_conditions`: opcional; uma expressão Condition;
-- `activation_costs`: opcional; array ordenado;
-- `usage_limit`: opcional;
-- `effect_form`: obrigatório: `ONE_SHOT` ou `CONTINUOUS`;
-- `resolution`: obrigatório quando `ONE_SHOT`;
-- `continuous`: obrigatório quando `CONTINUOUS`.
+- `activation_window`: required;
+- `activation_conditions`: optional; one Condition expression;
+- `activation_costs`: optional; ordered array;
+- `usage_limit`: optional;
+- `effect_form`: required: `ONE_SHOT` or `CONTINUOUS`;
+- `resolution`: required when `ONE_SHOT`;
+- `continuous`: required when `CONTINUOUS`.
 
-`activation_window` aceita `MAIN_PHASE` para Activate Effect autorizado na Main Phase ou `EVENT_CARD_RESOLUTION` para o texto de uma Event depois de sua ativação. A autorização `MAIN`/`COUNTER`/`TRIGGER` para ativar a própria carta Event permanece em `event_activation`.
+`activation_window` accepts `MAIN_PHASE` for an Activate Effect authorized during the Main Phase, or `EVENT_CARD_RESOLUTION` for an Event's text after the card has been activated. The `MAIN`/`COUNTER`/`TRIGGER` authorization for activating the Event card itself remains in `event_activation`.
 
 ### 11.3 Permanent Effect
 
-Campos obrigatórios: `scope` e `continuous`. `valid_when` é opcional; quando omitido, o efeito é válido sempre que a carta e as regras permitirem. Quando presente, é uma Condition avaliada continuamente. Não usar `resolution` para convertê-lo em sequência de ações pontuais.
+Required fields: `scope` and `continuous`. `valid_when` is optional; when omitted, the effect is valid whenever the card and the rules permit it. When present, it is a Condition evaluated continuously. Do not use `resolution` to convert it into a sequence of one-time actions.
 
 ### 11.4 Replacement Effect
 
-Campos obrigatórios: `replacement`; `available_when` é opcional quando a disponibilidade já decorre do processamento-alvo e das regras; `duration` só aparece se o texto/regra delimitar a disponibilidade.
+Required fields: `replacement`; `available_when` is optional when availability already follows from the target processing and the rules; `duration` appears only when the text/rules delimit availability.
 
-Replacement é categoria própria, não operação e não subtipo de Continuous. Não possui `effect_form`. `available_when` e `duration` delimitam a disponibilidade; a aplicação substitui uma parte de um processamento concreto. Se o procedimento substituto criar efeito contínuo, esse efeito declara sua própria duração.
+Replacement is its own category, not an operation or a subtype of Continuous. It has no `effect_form`. `available_when` and `duration` delimit availability; application replaces part of a specific processing procedure. If the replacement procedure creates a continuous effect, that effect declares its own duration.
 
-## 12. Condições e predicados
+## 12. Conditions and Predicates
 
-Uma Condition é uma tabela inline com exatamente uma forma: `all = [CONDITION, ...]`, `any = [CONDITION, ...]`, `not = CONDITION` ou `test = "TEST_NAME"` com os campos do teste. `all` e `any` exigem ao menos um item.
+A Condition is an inline table with exactly one form: `all = [CONDITION, ...]`, `any = [CONDITION, ...]`, `not = CONDITION`, or `test = "TEST_NAME"` together with that test's fields. `all` and `any` require at least one item.
 
-`activation_conditions`, `valid_when`, `available_when`, `filter` e `IF.condition` recebem uma Condition. Condições combinadas por `all` são simultâneas. O ponto de avaliação depende do campo: ativação antes de ativar; validade continuamente; resolução quando o passo é alcançado.
+`activation_conditions`, `valid_when`, `available_when`, `filter`, and `IF.condition` accept a Condition. Conditions combined through `all` are simultaneous. The evaluation point depends on the field: before activation for activation conditions; continuously for validity; and when the step is reached for resolution.
 
-### 12.1 Testes e campos
+### 12.1 Tests and Fields
 
-| `test` | Campos além de `test` |
-|---|---|
-| `PROPERTY_COMPARE` | `subject`, `property`, `operator` e `value`; com `INCLUSIVE_RANGE`, usar `minimum` e `maximum` no lugar de `value` |
-| `PLAYER_TURN` | `value` (`YOUR_TURN` ou `OPPONENT_TURN`) |
-| `DON_GIVEN_TO_SOURCE` | `operator`, `value` |
-| `DON_IN_FIELD` | `player`, `operator`, `value` |
-| `AREA_COUNT` | `area`, `player`, `operator`, `value` |
-| `OBJECT_COUNT` | `object`, `areas`, `player`, `operator`, `value` |
-| `SUM_COST` | `selection`, `operator`, `value` |
+| `test`                | Fields in addition to `test`                                                                                          |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `PROPERTY_COMPARE`    | `subject`, `property`, `operator`, and `value`; for `INCLUSIVE_RANGE`, use `minimum` and `maximum` instead of `value` |
+| `PLAYER_TURN`         | `value` (`YOUR_TURN` or `OPPONENT_TURN`)                                                                              |
+| `DON_GIVEN_TO_SOURCE` | `operator`, `value`                                                                                                   |
+| `DON_IN_FIELD`        | `player`, `operator`, `value`                                                                                         |
+| `AREA_COUNT`          | `area`, `player`, `operator`, `value`                                                                                 |
+| `OBJECT_COUNT`        | `object`, `areas`, `player`, `operator`, `value`                                                                      |
+| `SUM_COST`            | `selection`, `operator`, `value`                                                                                      |
 
-Propriedades de `PROPERTY_COMPARE`: `CATEGORY`, `NAME`, `COLOR`, `TYPE`, `ATTRIBUTE`, `POWER`, `BASE_POWER`, `COST`, `BASE_COST`, `LEADER_LIFE`, `COUNTER`, `STATE`, `AREA`, `PLAYER_CONTEXT`, `OWNER`, `CONTROLLER`, `KEYWORD_EFFECT`, `KEYWORD` e `DON_GIVEN_TO_CARD`. O tipo de `value` deve corresponder à propriedade: numérico para Power/Cost/Life/Counter e `DON_GIVEN_TO_CARD`; string para Name/Type/Keyword; enum para Category/Color/Attribute/State/Area/Keyword Effect; referência PLAYER para Owner/Controller/Player Context. Combinações sem comparação definida ficam bloqueadas.
+`PROPERTY_COMPARE` properties: `CATEGORY`, `NAME`, `COLOR`, `TYPE`, `ATTRIBUTE`, `POWER`, `BASE_POWER`, `COST`, `BASE_COST`, `LEADER_LIFE`, `COUNTER`, `STATE`, `AREA`, `PLAYER_CONTEXT`, `OWNER`, `CONTROLLER`, `KEYWORD_EFFECT`, `KEYWORD`, and `DON_GIVEN_TO_CARD`. The type of `value` must match the property: numeric for Power/Cost/Life/Counter and `DON_GIVEN_TO_CARD`; string for Name/Type/Keyword; enum for Category/Color/Attribute/State/Area/Keyword Effect; PLAYER reference for Owner/Controller/Player Context. Combinations without a defined comparison are blocked.
 
-`DON_GIVEN_TO_SOURCE` consulta DON!! dados à própria instância-fonte; `[DON!! xX]` corresponde a quantidade `GTE X`. `DON_IN_FIELD` conta DON!! nas áreas que formam o Field, não os DON!! dados à carta. `AREA_COUNT.area` é uma área do catálogo da §14. `OBJECT_COUNT.areas` contém referências AREA e `filter` é opcional (ausente = contar todos os objetos elegíveis); quando presente, o filtro usa `CANDIDATE` como sujeito. `SUM_COST` soma Cost do conjunto selecionado, não compara o Cost individual.
+`DON_GIVEN_TO_SOURCE` queries DON!! attached to the source instance itself; `[DON!! xX]` corresponds to quantity `GTE X`. `DON_IN_FIELD` counts DON!! in the areas that make up the Field, not DON!! attached to cards. `AREA_COUNT.area` is an area from the §14 catalog. `OBJECT_COUNT.areas` contains AREA references and `filter` is optional (if absent, count all eligible objects); when present, the filter uses `CANDIDATE` as its subject. `SUM_COST` sums the Cost of the selected set; it does not compare individual Cost values.
 
-Operadores: `EQ`, `GT`, `GTE`, `LT`, `LTE` e `INCLUSIVE_RANGE`. Para `INCLUSIVE_RANGE`, `minimum` e `maximum` são objetos Value numéricos, `minimum` não pode exceder `maximum`, e `value` é proibido. Para os demais operadores, `value` é obrigatório e `minimum`/`maximum` são proibidos. Não há `NE` nem aritmética geral. Campos não listados para o teste são rejeitados. Não congelar todo o estado no início da resolução nem reavaliar continuamente uma condição pontual.
+Operators: `EQ`, `GT`, `GTE`, `LT`, `LTE`, and `INCLUSIVE_RANGE`. For `INCLUSIVE_RANGE`, `minimum` and `maximum` must be numeric Value objects, `minimum` must not exceed `maximum`, and `value` is forbidden. For all other operators, `value` is required and `minimum`/`maximum` are forbidden. There is no `NE` or general arithmetic. Fields not listed for the test are rejected. Do not freeze the entire state at the beginning of resolution or continuously reevaluate a one-time condition.
 
-## 13. Valores
+## 13. Values
 
-Valores literais e dinâmicos usam objetos inline discriminados. Cada objeto contém exatamente uma forma:
+Literal and dynamic values use discriminated inline objects. Each object contains exactly one form:
 
-- `literal`: inteiro, string, booleano ou enum literal;
+- `literal`: integer, string, boolean, or enum literal;
 - `property = { subject = REF, name = "BASE_POWER" }`;
 - `count_area = { area = AREA_REF }`;
-- `count_objects = { object = "CARD", areas = [...], player = PLAYER_REF, filter = CONDITION }`; `filter` é opcional;
+- `count_objects = { object = "CARD", areas = [...], player = PLAYER_REF, filter = CONDITION }`; `filter` is optional;
 - `count_selection = "selection_id"`;
 - `don_count = { player = PLAYER_REF, scope = "FIELD" }`;
 - `don_given = { subject = REF }`;
 - `sum_cost = { selection = "selection_id" }`.
 
-`don_count.scope` aceita somente `FIELD`, `COST_AREA` ou `DON_DECK`. `property.name` usa as propriedades consultáveis da seção 12.1. Filtros usam `CANDIDATE` como sujeito para avaliar cada objeto examinado. `count_selection` e `sum_cost.selection` apontam para seleção anterior compatível na mesma resolução. `count_area.area` é uma referência `AREA`. `count_objects` exige `object`, `areas` e `player`; `filter` é opcional. Valores dinâmicos usam somente essas fontes; não há variável livre, função, acesso por ID arbitrário ou aritmética geral.
+`don_count.scope` accepts only `FIELD`, `COST_AREA`, or `DON_DECK`. `property.name` uses the queryable properties from §12.1. Filters use `CANDIDATE` as the subject when evaluating each examined object. `count_selection` and `sum_cost.selection` must reference a compatible earlier selection within the same resolution. `count_area.area` is an `AREA` reference. `count_objects` requires `object`, `areas`, and `player`; `filter` is optional. Dynamic values may use only these sources; there are no free variables, functions, arbitrary ID access, or general arithmetic.
 
-## 14. Referências
+## 14. References
 
-Áreas válidas: `DECK`, `DON_DECK`, `HAND`, `TRASH`, `LEADER_AREA`, `CHARACTER_AREA`, `STAGE_AREA`, `COST_AREA`, `LIFE_AREA`. `NONE` não é área.
+Valid areas: `DECK`, `DON_DECK`, `HAND`, `TRASH`, `LEADER_AREA`, `CHARACTER_AREA`, `STAGE_AREA`, `COST_AREA`, `LIFE_AREA`. `NONE` is not an area.
 
-Estados de cartas em áreas com estado: `ACTIVE`, `RESTED`. DON!! anexado a uma carta não possui nenhum desses estados (CR 4-4-2). Faces: `FACE_UP`, `FACE_DOWN`.
+Card states in areas with state: `ACTIVE`, `RESTED`. DON!! attached to a card has neither of these states (CR 4-4-2). Faces: `FACE_UP`, `FACE_DOWN`.
 
-Posições em pilhas: `TOP`, `BOTTOM`, `NORMAL` quando o procedimento oficial permitir posição normal.
+Stack positions: `TOP`, `BOTTOM`, `NORMAL` when the official procedure permits normal positioning.
 
-Referências identificam instâncias, papéis ou resultados definidos pelo motor ou por uma seleção anterior. Use somente uma das formas:
+References identify instances, roles, or results defined by the engine or by an earlier selection. Use exactly one of the following forms:
 
-| `kind` | Campos adicionais | Significado |
-|---|---|---|
-| `SOURCE` | nenhum | Instância que contém a habilidade no contexto da ativação |
-| `EVENT_OBJECT` | nenhum | Objeto que participou do evento contextual |
-| `PLAYER` | `role` | Papel de jogador |
-| `AREA` | `player`, `name` | Área pertencente ao jogador |
-| `SELECTED_OBJECT` | `selection` | Objeto singular obtido por seleção anterior |
-| `SELECTED_SET` | `selection` | Conjunto obtido por seleção anterior |
-| `TEXT_DESIGNATED_OBJECT` | `designation` | Objeto singular designado pelo texto/regra |
-| `ATTACKER` | nenhum | Atacante do contexto de batalha |
-| `ATTACK_TARGET` | nenhum | Alvo do ataque no contexto de batalha |
-| `BATTLE` | nenhum | Contexto de batalha fornecido pelo motor |
-| `TOP_CARD` | `player`, `area` | Carta que está no topo da área indicada naquele momento |
-| `CANDIDATE` | nenhum | Objeto candidato avaliado por um `filter` de seleção, escopo ou contagem |
+| `kind`                   | Additional fields | Meaning                                                           |
+| ------------------------ | ----------------- | ----------------------------------------------------------------- |
+| `SOURCE`                 | none              | Instance containing the ability in the activation context         |
+| `EVENT_OBJECT`           | none              | Object involved in the contextual event                           |
+| `PLAYER`                 | `role`            | Player role                                                       |
+| `AREA`                   | `player`, `name`  | Area belonging to a player                                        |
+| `SELECTED_OBJECT`        | `selection`       | Singular object obtained from an earlier selection                |
+| `SELECTED_SET`           | `selection`       | Set obtained from an earlier selection                            |
+| `TEXT_DESIGNATED_OBJECT` | `designation`     | Singular object designated by the text/rules                      |
+| `ATTACKER`               | none              | Attacker in the battle context                                    |
+| `ATTACK_TARGET`          | none              | Attack target in the battle context                               |
+| `BATTLE`                 | none              | Battle context provided by the engine                             |
+| `TOP_CARD`               | `player`, `area`  | Card at the top of the specified area at that moment              |
+| `CANDIDATE`              | none              | Candidate object evaluated by a selection, scope, or count filter |
 
-Uma referência `PLAYER` usa `{ kind = "PLAYER", role = ROLE }`; `AREA` usa `{ kind = "AREA", player = PLAYER_REF, name = AREA_NAME }`. `AREA_NAME` aceita somente as áreas listadas acima. `SELECTED_OBJECT`/`SELECTED_SET` usam `selection` igual ao ID de passo `SELECT` anterior. Os demais `kind` não aceitam campos extras.
+A `PLAYER` reference uses `{ kind = "PLAYER", role = ROLE }`; `AREA` uses `{ kind = "AREA", player = PLAYER_REF, name = AREA_NAME }`. `AREA_NAME` accepts only the areas listed above. `SELECTED_OBJECT`/`SELECTED_SET` use `selection` equal to the ID of a previous `SELECT` step. The other `kind` values accept no additional fields.
 
-Papéis de jogador:
+Player roles:
 
 `YOU`, `OPPONENT`, `TURN_PLAYER`, `NON_TURN_PLAYER`, `CONTEXT_PLAYER`, `OWNER`, `CONTROLLER`, `ACTIVATOR`, `CHOOSER`, `EXECUTOR`, `AFFECTED`.
 
-`TEXT_DESIGNATED_OBJECT.designation` deve reproduzir uma expressão exata presente em `abilities.source_text` e corresponder a uma única instância no contexto indicado. Não pode ser um rótulo inventado pela LLM. `CANDIDATE` só pode aparecer em `PROPERTY_COMPARE.subject` dentro de `SELECT.filter`, `continuous.scope.filter`, `OBJECT_COUNT.filter` ou filtro inline de pagamento; fora desses contextos é inválido.
+`TEXT_DESIGNATED_OBJECT.designation` must reproduce an exact expression present in `abilities.source_text` and correspond to a single instance in the indicated context. It must not be a label invented by the LLM. `CANDIDATE` may appear only in `PROPERTY_COMPARE.subject` within `SELECT.filter`, `continuous.scope.filter`, `OBJECT_COUNT.filter`, or an inline payment filter; elsewhere it is invalid.
 
-`CONTROLLER` só pode ser usado quando a distinção estiver fundamentada no texto/regra. `YOU` não é substituição universal de `OWNER`, `CONTROLLER`, `TURN_PLAYER` ou `ACTIVATOR`.
+`CONTROLLER` may be used only when the distinction is supported by the text/rules. `YOU` is not a universal substitute for `OWNER`, `CONTROLLER`, `TURN_PLAYER`, or `ACTIVATOR`.
 
-`NONE` não é uma área. Uma carta temporariamente sem área, como no ciclo de Trigger, é tratada pelo procedimento do motor e não por uma área artificial `NONE`.
+`NONE` is not an area. A card temporarily without an area, such as during the Trigger cycle, is handled by the engine procedure, not by an artificial `NONE` area.
 
-IDs de seleção são locais ao efeito. Uma referência a seleção só pode apontar para uma seleção anterior na mesma resolução. Não há referência a variável global, “última carta” implícita ou ID arbitrário de instância.
+Selection IDs are local to an effect. A selection reference may point only to an earlier selection within the same resolution. There is no reference to a global variable, an implicit "last card", or an arbitrary instance ID.
 
-## 15. Quantidades, seleções e escolhas
+## 15. Quantities, Selections, and Choices
 
-### 15.1 Quantidade
+### 15.1 Quantity
 
-Formas admitidas:
+Supported forms:
 
 - `{ mode = "FIXED", value = { literal = 2 } }`;
 - `{ mode = "UP_TO", maximum = { literal = 2 } }`;
 - `{ mode = "DYNAMIC", value = { count_area = { area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "TRASH" } } } }`.
 
-`FIXED` exige quantidade positiva. `UP_TO` exige limite não negativo e permite zero quando o CR/texto permite. `DYNAMIC` usa somente valores dinâmicos da seção 13 e não pode gerar quantidade negativa. Não existe modo `PROCEDURE`: `DRAW` com `UP_TO` executa o procedimento oficial de parar antes de cada compra até o limite. Quantidade fixa, `up to` e contagem dinâmica não são intercambiáveis.
+`FIXED` requires a positive quantity. `UP_TO` requires a non-negative limit and allows zero when permitted by the CR/text. `DYNAMIC` uses only the dynamic values from §13 and must not produce a negative quantity. There is no `PROCEDURE` mode: `DRAW` with `UP_TO` executes the official procedure of choosing to stop before each draw up to the limit. Fixed quantities, `up to`, and dynamic counts are not interchangeable.
 
-### 15.2 Seleção
+### 15.2 Selection
 
-Um passo `SELECT` declara:
+A `SELECT` step declares:
 
-- `id` único no efeito;
-- `object`: `CARD` ou `DON`;
-- `areas`: uma ou mais referências de área;
-- `filter` quando o texto restringir elegibilidade;
+- `id`, unique within the effect;
+- `object`: `CARD` or `DON`;
+- `areas`: one or more area references;
+- `filter` when the text restricts eligibility;
 - `quantity`;
 - `chooser`;
 - `information`;
-- `information_step` quando a informação vier de LOOK/REVEAL anterior;
-- `order_chooser` quando a regra/texto atribuir a um jogador a escolha da ordem.
+- `information_step` when the information comes from a previous LOOK/REVEAL;
+- `order_chooser` when the rules/text assign a player the choice of order.
 
-`information` aceita `PUBLIC_INFORMATION`, `OWNER_PRIVATE_INFORMATION`, `LOOKED_BY_CHOOSER`, `REVEALED_TO_CHOOSER` ou `FACE_DOWN_UNVERIFIABLE`. `information_step` é obrigatório somente para `LOOKED_BY_CHOOSER` e `REVEALED_TO_CHOOSER`, e proibido nos demais casos. Para `LOOKED_BY_CHOOSER`, deve apontar para um `LOOK` anterior cujo `player` seja o próprio `chooser`; os candidatos ficam limitados às cartas daquele resultado que ainda permaneçam na área examinada. Para `REVEALED_TO_CHOOSER`, deve apontar para um `REVEAL` anterior que tenha incluído o `chooser` em `recipients` (ou omitido `recipients`, tornando a informação pública); os candidatos ficam limitados às cartas reveladas que ainda permaneçam nas áreas indicadas. `OWNER_PRIVATE_INFORMATION` exige que o `chooser` seja o owner da área secreta consultada. `FACE_DOWN_UNVERIFIABLE` não dispensa as restrições do CR para selecionar em área secreta.
+`information` accepts `PUBLIC_INFORMATION`, `OWNER_PRIVATE_INFORMATION`, `LOOKED_BY_CHOOSER`, `REVEALED_TO_CHOOSER`, or `FACE_DOWN_UNVERIFIABLE`. `information_step` is required only for `LOOKED_BY_CHOOSER` and `REVEALED_TO_CHOOSER`, and forbidden otherwise. For `LOOKED_BY_CHOOSER`, it must reference an earlier `LOOK` whose `player` is the chooser themselves; candidates are restricted to cards from that result that remain in the examined area. For `REVEALED_TO_CHOOSER`, it must reference an earlier `REVEAL` that included the chooser in `recipients` (or omitted `recipients`, making the information public); candidates are restricted to revealed cards that remain in the indicated areas. `OWNER_PRIVATE_INFORMATION` requires the chooser to be the owner of the secret area being examined. `FACE_DOWN_UNVERIFIABLE` does not waive the CR restrictions on selecting from secret areas.
 
-A seleção não move, revela, K.O., descarta nem altera o objeto. Operações posteriores referenciam o ID da seleção. Uma seleção de cardinalidade singular produz `SELECTED_OBJECT`; uma seleção plural ou `UP_TO` produz `SELECTED_SET`. IDs são locais ao efeito e não sobrevivem à resolução.
+Selection does not move, reveal, K.O., discard, or otherwise alter the object. Subsequent operations reference the selection ID. A selection with singular cardinality produces `SELECTED_OBJECT`; a plural or `UP_TO` selection produces `SELECTED_SET`. IDs are local to the effect and do not survive resolution.
 
-`order_chooser` é uma referência PLAYER e só aparece quando o CR/texto dá a um jogador a escolha. Quando múltiplas cartas são colocadas simultaneamente em uma área, preserve a escolha de ordem exigida pelo CR. Nunca reescreva movimento simultâneo como sequência arbitrária.
+`order_chooser` is a PLAYER reference and appears only when the CR/text grants a player the choice. When multiple cards are placed simultaneously into an area, preserve any ordering choice required by the CR. Never rewrite simultaneous movement as an arbitrary sequence.
 
-### 15.3 Escolha de modo
+### 15.3 Mode Choice
 
-`CHOOSE_MODE` contém `id`, `chooser` e `options`, array ordenado. Cada opção contém `id` e `steps`. Cada opção representa somente um ramo realmente oferecido pelo texto. Escolher modo não é selecionar carta; escolhedor e executor são papéis separados.
+`CHOOSE_MODE` contains `id`, `chooser`, and an ordered `options` array. Each option contains `id` and `steps`. Each option represents only a branch actually offered by the text. Choosing a mode is not selecting a card; chooser and executor are separate roles.
 
-## 16. Replacement Effects — estrutura obrigatória
+## 16. Replacement Effects — Mandatory Structure
 
-Esta seção incorpora integralmente o conteúdo normativo relevante do antigo adendo Replacement Effects v1.1.1. **O adendo deixa de existir como documento normativo separado.** Em caso de divergência com versões antigas, esta seção prevalece para FCL 1.0.0.
+This section fully incorporates the relevant normative content of the former Replacement Effects v1.1.1 addendum. That addendum no longer exists as a separate normative document. In the event of a conflict with older versions, this section takes precedence for FCL 1.0.0.
 
-Toda declaração `category = "REPLACEMENT"` contém `[abilities.effects.replacement]`. `target` e `application` são tabelas descendentes; `costs` e `procedure` são arrays ordenados.
+Every declaration with `category = "REPLACEMENT"` contains `[abilities.effects.replacement]`. `target` and `application` are descendant tables; `costs` and `procedure` are ordered arrays.
 
-```toml
+```
 [[abilities]]
 id = "A3"
 source_text = "You may trash 1 card from your hand instead of paying the activation cost."
@@ -552,375 +556,385 @@ player = { kind = "PLAYER", role = "YOU" }
 selection = "R1"
 ```
 
-O exemplo demonstra forma estrutural; só é `SUPPORTED` se texto vigente, regra e contexto da carta sustentarem a substituição.
+The example demonstrates structural form; it is `SUPPORTED` only if the current text, rules, and card context substantiate the replacement.
 
-### 16.1 Campos obrigatórios
+### 16.1 Required Fields
 
-- `target`: procedimento que ocorreria, referência normativa e sujeito/contexto;
-- `point`: `BEFORE_PROCESSING` ou `DURING_PROCESSING`, conforme o ponto real de aplicação;
-- `replaced_part`: parte exata substituída;
-- `available_when`: condição adicional, se necessária;
-- `duration`: duração da disponibilidade, somente se definida por texto/regra;
-- `application`: decisão de aplicação;
-- `costs`: array de pagamentos, vazio se não houver;
-- `procedure`: sequência ordenada que substitui a parte identificada.
+- `target`: the procedure that would occur, normative reference, and subject/context;
+- `point`: `BEFORE_PROCESSING` or `DURING_PROCESSING`, according to the actual application point;
+- `replaced_part`: the exact part being replaced;
+- `available_when`: additional condition, if needed;
+- `duration`: availability duration, only when defined by text/rules;
+- `application`: application decision;
+- `costs`: ordered payment array, empty if there are no costs;
+- `procedure`: ordered sequence replacing the identified part.
 
-`target` contém `procedure`, `rule_ref` e `subject`. `rule_ref` deve apontar para um ID de `[source.references]` que identifique a regra/FAQ aplicável. `subject` é a referência do processamento que seria realizado; não pode ser omitida. O próprio local da declaração identifica carta, habilidade, efeito e owner de origem; o motor preserva essa proveniência para a atribuição normativa do CR 8-1-3-4-7.
+`target` contains `procedure`, `rule_ref`, and `subject`. `rule_ref` must point to an ID in `[source.references]` identifying the applicable rule/FAQ. `subject` is the reference for the processing that would otherwise occur; it cannot be omitted. The declaration's location itself identifies the card, ability, effect, and source owner; the engine preserves this provenance for the normative attribution required by CR 8-1-3-4-7.
 
-Catálogo fechado de `target.procedure`:
+Closed catalog of `target.procedure`:
 
-- `ACTIVATION_COST_PAYMENT` — pagamento de Activation Cost (CR 8-3-1-7);
-- `LEADER_DAMAGE_PROCESSING` — processamento de dano ao Leader (CR 4-6 e/ou 7-1-4, conforme a causa);
-- `CHARACTER_KO_PROCESSING` — procedimento de K.O. de Character (CR 10-2-1);
-- `EFFECT_REMOVAL_FROM_FIELD` — remoção de carta do Field por efeito, somente quando essa classe ampla estiver expressa no texto, por exemplo “would be removed from the field by your opponent's effect”;
-- `ORDINARY_CARD_MOVEMENT` — movimento comum entre áreas que não substitui K.O., dano, compra, Trigger, jogar carta ou DON!! −X.
+- `ACTIVATION_COST_PAYMENT` — Activation Cost payment (CR 8-3-1-7);
+- `LEADER_DAMAGE_PROCESSING` — Leader damage processing (CR 4-6 and/or 7-1-4, depending on the cause);
+- `CHARACTER_KO_PROCESSING` — Character K.O. procedure (CR 10-2-1);
+- `EFFECT_REMOVAL_FROM_FIELD` — removal of a card from the Field by an effect, only when this broad class is explicitly expressed in the text, for example, “would be removed from the field by your opponent's effect”;
+- `ORDINARY_CARD_MOVEMENT` — ordinary movement between areas that does not replace K.O., damage, drawing, Trigger, playing a card, or DON!! −X.
 
-`replaced_part` aceita `ACTIVATION_COST_PAYMENT`, `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE`, `CHARACTER_KO`, `FIELD_REMOVAL_BY_EFFECT` ou `ORDINARY_CARD_MOVEMENT`, conforme a matriz:
+`replaced_part` accepts `ACTIVATION_COST_PAYMENT`, `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE`, `CHARACTER_KO`, `FIELD_REMOVAL_BY_EFFECT`, or `ORDINARY_CARD_MOVEMENT`, according to the following matrix:
 
-| `target.procedure` | `replaced_part` permitido |
-|---|---|
-| `ACTIVATION_COST_PAYMENT` | `ACTIVATION_COST_PAYMENT` |
-| `LEADER_DAMAGE_PROCESSING` | `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE` |
-| `CHARACTER_KO_PROCESSING` | `CHARACTER_KO` |
-| `EFFECT_REMOVAL_FROM_FIELD` | `FIELD_REMOVAL_BY_EFFECT` |
-| `ORDINARY_CARD_MOVEMENT` | `ORDINARY_CARD_MOVEMENT` |
+| `target.procedure`          | Permitted `replaced_part`                     |
+| --------------------------- | --------------------------------------------- |
+| `ACTIVATION_COST_PAYMENT`   | `ACTIVATION_COST_PAYMENT`                     |
+| `LEADER_DAMAGE_PROCESSING`  | `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE` |
+| `CHARACTER_KO_PROCESSING`   | `CHARACTER_KO`                                |
+| `EFFECT_REMOVAL_FROM_FIELD` | `FIELD_REMOVAL_BY_EFFECT`                     |
+| `ORDINARY_CARD_MOVEMENT`    | `ORDINARY_CARD_MOVEMENT`                      |
 
-Esses valores não são intercambiáveis. `EFFECT_REMOVAL_FROM_FIELD` não significa qualquer mudança de área: só corresponde ao evento definido pelo texto de remoção do Field causada por efeito. Se o texto não permitir identificar a classe, bloquear.
+These values are not interchangeable. `EFFECT_REMOVAL_FROM_FIELD` does not mean any change of area: it corresponds only to the event defined by text describing removal from the Field caused by an effect. If the text does not identify the class, block translation.
 
-`application` contém exatamente `chooser` (PLAYER_REF), o jogador que decide aplicar ou recusar a substituição segundo a prioridade do CR 8-1-3-4. Toda substituição disponível pode ser recusada; se recusada, a substituição não resolve e o processamento original continua sem ela. Essa escolha é inerente ao procedimento de Replacement Effect e não é representada por um campo `optional`. Não confundir com `OPTIONAL` dentro de resolução, custo opcional ou seleção `UP_TO`.
+`application` contains exactly `chooser` (PLAYER_REF), the player who decides whether to apply or decline the replacement according to CR 8-1-3-4 priority. Any available replacement may be declined; if declined, the replacement does not resolve and the original processing continues without it. This choice is inherent to the Replacement Effect procedure and is not represented by an `optional` field. Do not confuse it with `OPTIONAL` during resolution, optional costs, or `UP_TO` selections.
 
-`costs` usa a estrutura de pagamentos da seção 17. `procedure` usa passos das seções 18 e 19. Os IDs dos passos são únicos dentro do Replacement Effect. O procedimento substituto precisa ser integralmente realizável e suportado; se não puder ser realizado, a substituição não pode ser aplicada.
+`costs` uses the payment structure from §17. `procedure` uses steps from §§18 and 19. Step IDs are unique within the Replacement Effect. The replacement procedure must be fully executable and supported; if it cannot be performed, the replacement cannot be applied.
 
-### 16.2 Regras que pertencem ao motor
+### 16.2 Rules Belonging to the Engine
 
-A carta declara a substituição; o motor aplica CR 8-1-3-4:
+The card declares the replacement; the engine applies CR 8-1-3-4:
 
-1. se disponível e recusada, a substituição não resolve;
-2. substituições concorrentes seguem a prioridade normativa: a relacionada à carta que gerou o efeito, depois as do Turn Player na ordem escolhida, depois as do Non-Turn Player na ordem escolhida;
-3. a mesma substituição não pode ser aplicada repetidamente ao mesmo processamento individual já substituído;
-4. a substituição troca toda a parte indicada, mesmo durante outra resolução; depois dela, o restante do texto continua na ordem do CR;
-5. procedimento substituto impossível não pode ser aplicado;
-6. uma substituição pode habilitar outra, sujeita às regras de prioridade e não repetição;
-7. a parte substituída é tratada como efeito ativado pelo owner do Replacement Effect.
+1. If available and declined, the replacement does not resolve.
+2. Competing replacements follow normative priority: first, the replacement associated with the card that generated the effect; next, those of the Turn Player in the order chosen; then those of the Non-Turn Player in the order chosen.
+3. The same replacement cannot be applied repeatedly to the same individual processing that it has already replaced.
+4. The replacement exchanges the entire indicated part, even during another resolution; afterward, the remaining text continues in the order prescribed by the CR.
+5. An impossible replacement procedure cannot be applied.
+6. One replacement may enable another, subject to priority and non-repetition rules.
+7. The replaced part is treated as an effect activated by the owner of the Replacement Effect.
 
-A carta não declara `priority`, algoritmo de encadeamento ou permissão para reaplicar a mesma substituição. O motor controla esses procedimentos. A identidade do evento/processamento substituído é mantida pelo motor; um novo evento independente pode voltar a oferecer a mesma substituição.
+The card does not declare `priority`, a chaining algorithm, or permission to reapply the same replacement. The engine controls these procedures. The identity of the replaced event/processing is maintained by the engine; a new independent event may offer the same replacement again.
 
-### 16.3 Substituição de Activation Cost — CR 8-3-1-7
+### 16.3 Activation Cost Replacement — CR 8-3-1-7
 
-Quando `target.procedure = "ACTIVATION_COST_PAYMENT"`:
+When `target.procedure = "ACTIVATION_COST_PAYMENT"`:
 
-1. a declaração identifica expressamente o pagamento de Activation Cost substituído;
-2. o procedimento substituto é processado no lugar do pagamento original;
-3. se o Activation Cost não for pago como descrito no texto, o efeito depois de `:` não é processado;
-4. custo original, procedimento substituto e resolução depois de `:` permanecem elementos distintos.
+1. The declaration explicitly identifies the Activation Cost payment being replaced.
+2. The replacement procedure is processed instead of the original payment.
+3. If the Activation Cost is not paid as described in the text, the effect after `:` is not processed.
+4. The original cost, replacement procedure, and resolution after `:` remain distinct elements.
 
-A substituição não autoriza mover o pagamento para a resolução nem presumir que o texto depois de `:` sempre resolve.
+The replacement does not authorize moving the payment into resolution or assuming that the text after `:` always resolves.
 
-### 16.4 Custos coletivos
+### 16.4 Collective Costs
 
-Não existe regra genérica de pagamento único para várias substituições. Evento simultâneo que afeta vários objetos, várias remoções individuais e um custo textual são situações distintas. A tradução preserva a quantidade/unidade de pagamentos determinada pela carta e pelas fontes oficiais. Quando isso não estiver determinado, usar `BLOCKED_NORMATIVE`; não codificar “pagar uma vez independentemente da quantidade”.
+There is no generic rule for making a single payment across multiple replacements. A simultaneous event affecting multiple objects, multiple individual removals, and a textual cost are distinct situations. Translation must preserve the payment quantity/unit determined by the card and official sources. When that cannot be determined, use `BLOCKED_NORMATIVE`; do not encode "pay once regardless of quantity."
 
-### 16.5 Limite do catálogo
+### 16.5 Catalog Boundary
 
-Replacement não pode ser omitido, convertido em `PERMANENT`, representado como operação `REPLACE` em resolução ou convertido em movimento genérico sem preservar o processamento substituído. Casos fora do catálogo desta seção ficam `BLOCKED_CAPABILITY` ou `BLOCKED_NORMATIVE`, conforme a causa.
+Replacement must not be omitted, converted into `PERMANENT`, represented as a `REPLACE` operation during resolution, or converted into generic movement without preserving the replaced processing. Cases outside this section's catalog remain `BLOCKED_CAPABILITY` or `BLOCKED_NORMATIVE`, depending on the cause.
 
-## 17. Custos e pagamentos
+## 17. Costs and Payments
 
-`activation_costs` e `replacement.costs` são arrays ordenados. Cada pagamento é uma tabela inline discriminada por `kind`; campos não definidos para o tipo são rejeitados.
+`activation_costs` and `replacement.costs` are ordered arrays. Each payment is a discriminated inline table using `kind`; fields not defined for the given type are rejected.
 
-| `kind` | Campos obrigatórios | Regra |
-|---|---|---|
-| `REST_DON` | `kind`, `payer`, `selection` | Selecionar e restar a quantidade indicada de DON!! active na Cost Area do pagador. |
-| `DON_MINUS` | `kind`, `payer`, `selection` | Selecionar a quantidade indicada de DON!! nas Leader, Character e Cost Areas do pagador e retorná-los ao DON!! Deck, conforme CR 8-3-1-6; qualquer estado é elegível. |
-| `REST_CARD` | `kind`, `payer`, `selection` | Selecionar e restar uma carta active elegível no contexto do pagador. |
-| `TRASH_HAND_CARD` | `kind`, `payer`, `selection` | Selecionar uma carta da mão do pagador e enviá-la à Trash. |
+| `kind`            | Required fields              | Rule                                                                                                                                                                       |
+| ----------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REST_DON`        | `kind`, `payer`, `selection` | Select and rest the indicated quantity of active DON!! in the payer's Cost Area.                                                                                           |
+| `DON_MINUS`       | `kind`, `payer`, `selection` | Select the indicated quantity of DON!! in the payer's Leader, Character, and Cost Areas and return them to the DON!! Deck, according to CR 8-3-1-6; any state is eligible. |
+| `REST_CARD`       | `kind`, `payer`, `selection` | Select and rest an eligible active card in the payer's context.                                                                                                            |
+| `TRASH_HAND_CARD` | `kind`, `payer`, `selection` | Select a card from the payer's hand and send it to the Trash.                                                                                                              |
 
-Em pagamentos, `selection` é uma tabela inline própria, não um ID de passo `SELECT`. Campos obrigatórios: `object` (`CARD` ou `DON`), `areas` (array não vazio de AREA_REF), `quantity` (§15.1), `chooser` (PLAYER_REF) e `information` (vocabulário de §15.2). `filter` (Condition) é opcional e, quando presente, usa `CANDIDATE` como sujeito. Para `REST_DON`, `areas` deve apontar apenas à Cost Area de `payer`, `object = "DON"` e `filter` deve restringir `STATE = ACTIVE`. Para `DON_MINUS`, `areas` deve apontar às três áreas permitidas do pagador. Para `REST_CARD` e `TRASH_HAND_CARD`, `quantity` deve ser FIXED 1. `REST_CARD.filter` deve restringir `STATE = ACTIVE`. Para `TRASH_HAND_CARD`, `areas` deve apontar à Hand de `payer`. O `chooser` é o jogador que escolhe; se texto/regra não permitir determinar esse jogador, bloquear.
+For payments, `selection` is its own inline table, not a `SELECT` step ID. Required fields: `object` (`CARD` or `DON`), `areas` (non-empty array of AREA_REF), `quantity` (§15.1), `chooser` (PLAYER_REF), and `information` (the §15.2 vocabulary). `filter` (Condition) is optional and, when present, uses `CANDIDATE` as its subject.
 
-DON!! só pode ser anexado pela operação `GIVE_DON`; pagamentos não transferem DON!! dado a outra carta. `REST_DON` usa DON!! active. `GIVE_DON.source_state = "RESTED"` só é permitido quando texto/FAQ oficial autorizar selecionar DON!! rested da Cost Area; a EB05-057 confirma somente seu caso específico. Depois de anexado, DON!! não é active nem rested (CR 4-4-2).
+For `REST_DON`, `areas` must point only to the payer's Cost Area, `object = "DON"`, and `filter` must restrict `STATE = ACTIVE`.
 
-Regras obrigatórias:
+For `DON_MINUS`, `areas` must point to the payer's three permitted areas.
 
-- custo para jogar uma carta não é `activation_costs`;
-- pagamentos ocorrem antes da resolução e preservam ordem textual;
-- custos adicionados por outros efeitos são processados na ordem normativa do efeito que os adicionou;
-- se, antes da ativação, não for possível pagar todo o custo, o efeito não pode ser ativado;
-- se, depois da ativação, o pagamento se tornar impossível durante o processamento, paga-se o máximo possível, mas o texto depois de `:` não resolve (CR 8-3-1-3-1);
-- se um custo opcional é recusado, o efeito associado não ativa;
-- caminho alternativo de custo não é escolha de modo; não presumir que custos alternativos/adicionais sejam combináveis;
-- substituição de Activation Cost é declarada como Replacement Effect e segue §16.3.
+For `REST_CARD` and `TRASH_HAND_CARD`, `quantity` must be FIXED 1. `REST_CARD.filter` must restrict `STATE = ACTIVE`. For `TRASH_HAND_CARD`, `areas` must point to the payer's Hand.
 
-Outros tipos de pagamento ficam `BLOCKED_CAPABILITY` até extensão versionada.
+The `chooser` is the player who makes the selection; if the text/rules do not determine that player, block translation.
 
-## 18. Resolução — `resolution` e `steps`
+DON!! may only be attached through the `GIVE_DON` operation; payments do not transfer DON!! attached to another card. `REST_DON` uses active DON!!. `GIVE_DON.source_state = "RESTED"` is permitted only when official text/FAQ authorizes selecting rested DON!! from the Cost Area; EB05-057 confirms only its specific case. Once attached, DON!! is neither active nor rested (CR 4-4-2).
 
-`resolution` é um array ordenado de passos. Todo passo tem `id` único no efeito (inclusive ramos aninhados) e `kind`. Campos por `kind` são fechados:
+Mandatory rules:
 
-| `kind` | Campos obrigatórios além de `id`/`kind` | Campos opcionais |
-|---|---|---|
-| `SELECT` | `object`, `areas`, `quantity`, `chooser`, `information` | `filter`, `information_step`, `order_chooser` |
-| `OPERATION` | `operation` e os campos obrigatórios de §19.1 | somente os opcionais de §19.1 |
-| `IF` | `condition`, `steps` | — |
-| `THEN` | `steps` | — |
-| `IF_YOU_DO` | `depends_on`, `steps` | — |
-| `OPTIONAL` | `chooser`, `steps` | — |
-| `CHOOSE_MODE` | `chooser`, `options` | — |
-| `SIMULTANEOUS` | `steps` | — |
-| `REPEAT` | `quantity`, `steps` | — |
+- A cost to play a card is not `activation_costs`.
+- Payments occur before resolution and preserve textual order.
+- Costs added by other effects are processed in the normative order of the effect that added them.
+- If it is impossible to pay the entire cost before activation, the effect cannot be activated.
+- If payment becomes impossible during processing after activation, pay as much as possible, but the text after `:` does not resolve (CR 8-3-1-3-1).
+- If an optional cost is declined, the associated effect does not activate.
+- An alternative cost path is not a mode choice; do not assume alternative/additional costs are combinable.
+- Activation Cost replacement is declared as a Replacement Effect and follows §16.3.
 
-`SELECT` segue §15.2. `OPERATION` só usa referências válidas no momento de execução. Em `IF`, `steps` contém exatamente o trecho que depende da condição; passos fora desse bloco não herdam a condição implicitamente. `THEN` contém os passos da cláusula textual correspondente, sem criar por si só dependência de sucesso do passo anterior. `IF_YOU_DO.depends_on` aponta para passo anterior que executa a ação citada; a dependência é o resultado definido pelo texto/CR, não uma regra universal de sucesso total. Se esse resultado não for determinável, bloquear.
+Other payment types remain `BLOCKED_CAPABILITY` until a versioned extension is introduced.
+
+## 18. Resolution — `resolution` and `steps`
+
+`resolution` is an ordered array of steps. Every step has an `id` unique within the effect (including nested branches) and a `kind`. Fields are closed by `kind`:
+
+| `kind`         | Required fields beyond `id`/`kind`                      | Optional fields                               |
+| -------------- | ------------------------------------------------------- | --------------------------------------------- |
+| `SELECT`       | `object`, `areas`, `quantity`, `chooser`, `information` | `filter`, `information_step`, `order_chooser` |
+| `OPERATION`    | `operation` and the required fields from §19.1          | Only the optional fields from §19.1           |
+| `IF`           | `condition`, `steps`                                    | —                                             |
+| `THEN`         | `steps`                                                 | —                                             |
+| `IF_YOU_DO`    | `depends_on`, `steps`                                   | —                                             |
+| `OPTIONAL`     | `chooser`, `steps`                                      | —                                             |
+| `CHOOSE_MODE`  | `chooser`, `options`                                    | —                                             |
+| `SIMULTANEOUS` | `steps`                                                 | —                                             |
+| `REPEAT`       | `quantity`, `steps`                                     | —                                             |
+
+`SELECT` follows §15.2. `OPERATION` uses only references valid at execution time. In `IF`, `steps` contains exactly the portion dependent on the condition; steps outside that block do not implicitly inherit the condition. `THEN` contains the steps of the corresponding textual clause and does not itself create a dependency on the previous step's success. `IF_YOU_DO.depends_on` points to a previous step that performs the cited action; the dependency is the result defined by the text/CR, not a universal rule requiring total success. If that result cannot be determined, block translation.
 
 ### 18.1 `SELECT`
 
-Cria uma seleção conforme §15.2. O ID do passo nomeia o resultado e só pode ser referenciado depois dele, dentro da mesma resolução.
+Creates a selection according to §15.2. The step ID names the result and may only be referenced afterward, within the same resolution.
 
 ### 18.2 `OPERATION`
 
-Contém `operation` e os parâmetros obrigatórios da matriz §19.1. Só usa referências válidas no momento de execução.
+Contains `operation` and the required parameters from the §19.1 matrix. It uses only references valid at execution time.
 
 ### 18.3 `IF`
 
-A condição é avaliada quando o passo é alcançado. Ações impossíveis e consequências sobre passos posteriores seguem texto e CR; não existe rollback geral.
+The condition is evaluated when the step is reached. Impossible actions and their consequences for subsequent steps follow the text and CR; there is no general rollback.
 
 ### 18.4 `THEN`
 
-Contém `steps`. Marca a cláusula textual subsequente; não cria dependência universal de sucesso do passo imediatamente anterior.
+Contains `steps`. It marks the subsequent textual clause; it does not create a universal dependency on the immediately preceding step's success.
 
 ### 18.5 `IF_YOU_DO`
 
-Contém `depends_on` (ID de passo anterior) e `steps`. Não definir sucesso como “todos”, “pelo menos um” ou “ação atômica” sem fundamento específico.
+Contains `depends_on` (ID of a previous step) and `steps`. Do not define success as "all", "at least one", or "atomic action" without specific normative support.
 
 ### 18.6 `OPTIONAL`
 
-Contém `chooser` e `steps`. Representa somente ação durante a resolução que o texto permite recusar. Não é custo opcional, seleção `UP_TO`, escolha de modo nem recusa de Replacement Effect.
+Contains `chooser` and `steps`. Represents only an action during resolution that the text allows the player to decline. It is not an optional cost, `UP_TO` selection, mode choice, or refusal of a Replacement Effect.
 
 ### 18.7 `CHOOSE_MODE`
 
-Contém `chooser` e `options`, array não vazio. Cada opção contém `id` único dentro do `CHOOSE_MODE` e `steps`, em ordem textual. Cada ramo contém somente instruções daquela opção.
+Contains `chooser` and a non-empty `options` array. Each option contains an `id` unique within the `CHOOSE_MODE` and `steps`, in textual order. Each branch contains only instructions belonging to that option.
 
 ### 18.8 `SIMULTANEOUS`
 
-Contém `steps` agrupados como simultâneos. O agrupamento não pode ser reescrito como sequência. Escolhas de ordem e ordem de decisões entre jogadores continuam sendo determinadas pelo CR.
+Contains `steps` grouped as simultaneous. The group must not be rewritten as a sequence. Ordering choices and the order of decisions between players remain determined by the CR.
 
 ### 18.9 `REPEAT`
 
-Contém `quantity` e `steps`. Somente repetição finita: quantidade fixa, dinâmica explicitamente suportada ou `UP_TO` quando autorizado. Não há loop livre, condição de parada arbitrária ou recursão. O motor trata eventos gerados, Trigger, `rule processing` e loops gerais.
+Contains `quantity` and `steps`. Only finite repetition is permitted: a fixed quantity, an explicitly supported dynamic quantity, or `UP_TO` when authorized. There are no unrestricted loops, arbitrary stopping conditions, or recursion. The engine handles generated events, Trigger, `rule processing`, and general loops.
 
-## 19. Operações admitidas
+## 19. Supported Operations
 
-`operation` aceita somente as famílias abaixo. O identificador é uma instrução semântica; a execução concreta é procedimento do motor.
+`operation` accepts only the families below. The identifier is a semantic instruction; concrete execution is an engine procedure.
 
-| Identificador | Semântica |
-|---|---|
-| `DRAW` | Comprar do topo do Deck pelo procedimento oficial. `UP_TO` usa a escolha de parar antes de cada compra. |
-| `TRASH_HAND` | Enviar carta selecionada da Hand à Trash; não é K.O. |
-| `TRASH_DECK` | Enviar carta do Deck à Trash pelo procedimento autorizado de seleção/informação; não é compra. |
-| `KO_CHARACTER` | Aplicar procedimento oficial de K.O. a Character elegível; gera timing/evento de K.O. |
-| `MOVE_CARD` | Movimento comum entre áreas; não equivale a K.O., dano, compra, Trigger, jogar carta ou DON!! −X. |
-| `REST` | Alterar active para rested; objeto já rested permanece assim. |
-| `SET_ACTIVE` | Alterar rested para active; objeto já active permanece assim. |
-| `GIVE_DON` | Anexar DON!! da Cost Area a Leader/Character permitido; `source_state` declara o estado antes de anexar. O DON!! anexado não fica em estado active nem rested (CR 4-4-2). |
-| `ADD_DON` | Mover DON!! do DON!! Deck para Cost Area com estado de chegada definido. |
-| `DON_MINUS` | Executar procedimento oficial DON!! −X, selecionando DON!! nas Leader, Character e Cost Areas permitidas. |
-| `PLAY_CARD` | Invocar procedimento oficial de jogar carta por efeito; não é movimento simples para o Field. O procedimento de jogar por efeito não cobra o Cost impresso, salvo custo adicional expressamente aplicável. |
-| `REVEAL` | Revelar sem mover o `subject`, a `selection` ou todas as cartas vistas por `look_step`; `recipients` identifica quem recebe a informação. O motor mantém o histórico conforme o procedimento oficial. |
-| `LOOK` | Olhar as `quantity` cartas do topo da área ordenada indicada, sem mover, revelar aos demais ou alterar a ordem. Produz um conjunto temporário, identificado pelo próprio ID do passo e disponível somente na mesma resolução. |
-| `SHUFFLE_DECK` | Embaralhar Deck autorizado pelo procedimento. |
-| `MODIFY_POWER` | Modificar Power efetivo, não base Power; aceita valores negativos conforme CR. |
-| `SET_BASE_POWER` | Definir base Power com precedência normativa; não ajustar Power efetivo. |
-| `MODIFY_COST` | Modificar Cost efetivo; Cost final usado pelo jogo não fica abaixo de zero. |
-| `SET_BASE_COST` | Definir base Cost com precedência normativa; não modificar Cost efetivo. |
-| `MODIFY_CHARACTERISTIC` | Alterar/conceder somente `NAME`, `TYPE` ou `ATTRIBUTE` neste perfil. |
-| `GRANT_KEYWORD_EFFECT` | Conceder Keyword Effect/Keyword reconhecido, com validade e duração. |
-| `DEAL_LEADER_DAMAGE` | Invocar procedimento oficial de dano ao Leader por efeito, incluindo Life, Trigger, substituições e derrota. |
-| `MOVE_LIFE_CARD` | Movimento comum envolvendo Life; não é dano e não oferece Trigger por si só. |
-| `POSITION_CARD` | Posicionar carta no topo/fundo de pilha autorizada. |
-| `RETURN_CARD` | Retornar carta à Hand, Deck ou Trash, preservando destino e owner/player. |
-| `END_GAME` | Conceder vitória/derrota somente quando explicitamente autorizado pelo texto/regra. |
+| Identifier              | Semantics                                                                                                                                                                                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DRAW`                  | Draw from the top of the Deck through the official procedure. `UP_TO` uses the choice to stop before each draw.                                                                                                                                          |
+| `TRASH_HAND`            | Send a selected card from the Hand to the Trash; this is not K.O.                                                                                                                                                                                        |
+| `TRASH_DECK`            | Send a card from the Deck to the Trash through an authorized selection/information procedure; this is not drawing.                                                                                                                                       |
+| `KO_CHARACTER`          | Apply the official K.O. procedure to an eligible Character; generates a K.O. timing/event.                                                                                                                                                               |
+| `MOVE_CARD`             | Ordinary movement between areas; not equivalent to K.O., damage, drawing, Trigger, playing a card, or DON!! −X.                                                                                                                                          |
+| `REST`                  | Change active to rested; an already rested object remains rested.                                                                                                                                                                                        |
+| `SET_ACTIVE`            | Change rested to active; an already active object remains active.                                                                                                                                                                                        |
+| `GIVE_DON`              | Attach DON!! from the Cost Area to an eligible Leader/Character; `source_state` declares its state before attachment. Attached DON!! is neither active nor rested (CR 4-4-2).                                                                            |
+| `ADD_DON`               | Move DON!! from the DON!! Deck to the Cost Area with a defined arrival state.                                                                                                                                                                            |
+| `DON_MINUS`             | Execute the official DON!! −X procedure, selecting DON!! from the permitted Leader, Character, and Cost Areas.                                                                                                                                           |
+| `PLAY_CARD`             | Invoke the official procedure for playing a card by an effect; this is not simple movement to the Field. The procedure for playing by an effect does not charge the printed Cost unless an expressly applicable additional cost applies.                 |
+| `REVEAL`                | Reveal without moving `subject`, `selection`, or all cards viewed through `look_step`; `recipients` identifies who receives the information. The engine maintains the history according to the official procedure.                                       |
+| `LOOK`                  | Look at the `quantity` cards from the top of the indicated ordered area, without moving them, revealing them to others, or changing their order. Produces a temporary set identified by the step's own ID and available only within the same resolution. |
+| `SHUFFLE_DECK`          | Shuffle a Deck as authorized by the procedure.                                                                                                                                                                                                           |
+| `MODIFY_POWER`          | Modify effective Power, not base Power; accepts negative values according to the CR.                                                                                                                                                                     |
+| `SET_BASE_POWER`        | Set base Power with normative precedence; does not adjust effective Power.                                                                                                                                                                               |
+| `MODIFY_COST`           | Modify effective Cost; the final Cost used by the game cannot be below zero.                                                                                                                                                                             |
+| `SET_BASE_COST`         | Set base Cost with normative precedence; does not modify effective Cost.                                                                                                                                                                                 |
+| `MODIFY_CHARACTERISTIC` | Modify/grant only `NAME`, `TYPE`, or `ATTRIBUTE` in this profile.                                                                                                                                                                                        |
+| `GRANT_KEYWORD_EFFECT`  | Grant a recognized Keyword Effect/Keyword, with validity and duration.                                                                                                                                                                                   |
+| `DEAL_LEADER_DAMAGE`    | Invoke the official procedure for dealing damage to a Leader by an effect, including Life, Trigger, replacements, and defeat.                                                                                                                            |
+| `MOVE_LIFE_CARD`        | Ordinary movement involving Life; it is not damage and does not trigger Trigger by itself.                                                                                                                                                               |
+| `POSITION_CARD`         | Position a card at the top/bottom of an authorized stack.                                                                                                                                                                                                |
+| `RETURN_CARD`           | Return a card to the Hand, Deck, or Trash, preserving destination and owner/player.                                                                                                                                                                      |
+| `END_GAME`              | Grant victory/defeat only when explicitly authorized by the text/rules.                                                                                                                                                                                  |
 
-### 19.1 Parâmetros por operação
+### 19.1 Parameters by Operation
 
-`subject` é uma referência singular da §14; `selection` é o ID de um `SELECT` anterior no mesmo efeito. Quando a matriz diz `subject` ou `selection`, exatamente um deve aparecer. Referências de área são AREA_REF, `player` é PLAYER_REF, quantidades seguem §15.1 e durações seguem §21. Nenhum campo adicional é permitido.
+`subject` is a singular reference from §14; `selection` is the ID of a previous `SELECT` in the same effect. When the matrix specifies `subject` or `selection`, exactly one must be present. Area references are AREA_REF, `player` is PLAYER_REF, quantities follow §15.1, and durations follow §21. No additional fields are permitted.
 
-| Operação | Campos obrigatórios | Campos opcionais permitidos |
-|---|---|---|
-| `DRAW` | `player`, `quantity` | — |
-| `TRASH_HAND` | `player`, `selection` | — |
-| `TRASH_DECK` | `player`, `selection` | — |
-| `KO_CHARACTER` | `subject` ou `selection` | — |
-| `MOVE_CARD` | `subject` ou `selection`, `source_area`, `destination_area` | `face`, `state`, `position`, `order_chooser` |
-| `REST` / `SET_ACTIVE` | `subject` ou `selection` | — |
-| `GIVE_DON` | destinatário `subject` ou `selection`, `quantity`, `source_state` | — |
-| `ADD_DON` | `player`, `quantity`, `arrival_state` | — |
-| `DON_MINUS` | `player`, `quantity` | — |
-| `PLAY_CARD` | carta `subject` ou `selection`, `source_area`, `player` | `state` |
-| `REVEAL` | exatamente um: `subject`, `selection` ou `look_step` | `recipients` |
-| `LOOK` | `area`, `player`, `quantity` | — |
-| `SHUFFLE_DECK` | `player` | — |
-| `MODIFY_POWER` | `subject` ou `selection`, `operator`, `value`, `duration` | — |
-| `SET_BASE_POWER` | `subject` ou `selection`, `value`, `duration` | — |
-| `MODIFY_COST` | `subject` ou `selection`, `operator`, `value`, `duration` | — |
-| `SET_BASE_COST` | `subject` ou `selection`, `value`, `duration` | — |
-| `MODIFY_CHARACTERISTIC` | `subject` ou `selection`, `property`, `operator`, `value`, `duration` | — |
-| `GRANT_KEYWORD_EFFECT` | `subject` ou `selection`, `keyword_effect`, `duration` | — |
-| `DEAL_LEADER_DAMAGE` | `player`, `quantity` | — |
-| `MOVE_LIFE_CARD` | `subject` ou `selection`, `source_area`, `destination_area` | `position`, `face`, `order_chooser` |
-| `POSITION_CARD` | `subject` ou `selection`, `destination_area`, `position` | `order_chooser` |
-| `RETURN_CARD` | `subject` ou `selection`, `destination_area` | `position` |
-| `END_GAME` | `player`, `outcome` (`WIN` ou `LOSE`) | — |
+| Operation               | Required fields                                                       | Permitted optional fields                    |
+| ----------------------- | --------------------------------------------------------------------- | -------------------------------------------- |
+| `DRAW`                  | `player`, `quantity`                                                  | —                                            |
+| `TRASH_HAND`            | `player`, `selection`                                                 | —                                            |
+| `TRASH_DECK`            | `player`, `selection`                                                 | —                                            |
+| `KO_CHARACTER`          | `subject` or `selection`                                              | —                                            |
+| `MOVE_CARD`             | `subject` or `selection`, `source_area`, `destination_area`           | `face`, `state`, `position`, `order_chooser` |
+| `REST` / `SET_ACTIVE`   | `subject` or `selection`                                              | —                                            |
+| `GIVE_DON`              | recipient `subject` or `selection`, `quantity`, `source_state`        | —                                            |
+| `ADD_DON`               | `player`, `quantity`, `arrival_state`                                 | —                                            |
+| `DON_MINUS`             | `player`, `quantity`                                                  | —                                            |
+| `PLAY_CARD`             | card `subject` or `selection`, `source_area`, `player`                | `state`                                      |
+| `REVEAL`                | Exactly one of: `subject`, `selection`, or `look_step`                | `recipients`                                 |
+| `LOOK`                  | `area`, `player`, `quantity`                                          | —                                            |
+| `SHUFFLE_DECK`          | `player`                                                              | —                                            |
+| `MODIFY_POWER`          | `subject` or `selection`, `operator`, `value`, `duration`             | —                                            |
+| `SET_BASE_POWER`        | `subject` or `selection`, `value`, `duration`                         | —                                            |
+| `MODIFY_COST`           | `subject` or `selection`, `operator`, `value`, `duration`             | —                                            |
+| `SET_BASE_COST`         | `subject` or `selection`, `value`, `duration`                         | —                                            |
+| `MODIFY_CHARACTERISTIC` | `subject` or `selection`, `property`, `operator`, `value`, `duration` | —                                            |
+| `GRANT_KEYWORD_EFFECT`  | `subject` or `selection`, `keyword_effect`, `duration`                | —                                            |
+| `DEAL_LEADER_DAMAGE`    | `player`, `quantity`                                                  | —                                            |
+| `MOVE_LIFE_CARD`        | `subject` or `selection`, `source_area`, `destination_area`           | `position`, `face`, `order_chooser`          |
+| `POSITION_CARD`         | `subject` or `selection`, `destination_area`, `position`              | `order_chooser`                              |
+| `RETURN_CARD`           | `subject` or `selection`, `destination_area`                          | `position`                                   |
+| `END_GAME`              | `player`, `outcome` (`WIN` or `LOSE`)                                 | —                                            |
 
-`source_area`, `destination_area` e `area` são AREA_REF, exceto `AREA_COUNT.area` na §12.1, que é AREA_NAME. `recipients` é array não vazio de PLAYER_REF; omitido significa informação pública. `LOOK` não muda a publicidade da carta: a informação permanece restrita ao jogador indicado pelo procedimento; não há `recipients` em `LOOK`. `LOOK` examina as primeiras `quantity` cartas de uma área ordenada, cria um conjunto temporário e não altera a área nem a ordem. `REVEAL.look_step` é o ID de um passo `LOOK` anterior e revela todas as cartas daquele conjunto; se `REVEAL` usar `subject` ou `selection`, revela somente o objeto/conjunto indicado. `look_step` só pode apontar para um `LOOK` anterior na mesma resolução. `face` aceita `FACE_UP` ou `FACE_DOWN`; `state`/`source_state`/`arrival_state` aceitam `ACTIVE` ou `RESTED`; `position` aceita `TOP`, `BOTTOM` ou `NORMAL` quando permitido pelo procedimento. `order_chooser` é PLAYER_REF.
+`source_area`, `destination_area`, and `area` are AREA_REF, except for `AREA_COUNT.area` in §12.1, which is AREA_NAME. `recipients` is a non-empty array of PLAYER_REF; if omitted, the information is public. `LOOK` does not change the visibility of the card: information remains restricted to the player specified by the procedure; `LOOK` has no `recipients` field. `LOOK` examines the first `quantity` cards of an ordered area, creates a temporary set, and does not change the area or its order. `REVEAL.look_step` is the ID of a previous `LOOK` step and reveals all cards in that set; if `REVEAL` uses `subject` or `selection`, it reveals only the indicated object/set. `look_step` may point only to a previous `LOOK` in the same resolution.
 
-`GIVE_DON.source_state = "ACTIVE"` é o caso normal; `source_state = "RESTED"` só é suportado quando texto/FAQ oficial autorizar essa seleção. EB05-057 confirma apenas o cenário perguntado. Ao anexar, o DON!! deixa de ter estado active/rested, conforme CR 4-4-2. `GIVE_DON` sempre usa DON!! da Cost Area, nunca DON!! dado a outra carta. `ADD_DON` move DON!! do DON!! Deck para a Cost Area.
+`face` accepts `FACE_UP` or `FACE_DOWN`; `state`/`source_state`/`arrival_state` accept `ACTIVE` or `RESTED`; `position` accepts `TOP`, `BOTTOM`, or `NORMAL` when permitted by the procedure. `order_chooser` is a PLAYER_REF.
 
-`MODIFY_POWER.operator` e `MODIFY_COST.operator` aceitam `ADD` ou `SUBTRACT`. `MODIFY_CHARACTERISTIC.property` aceita somente `NAME`, `TYPE` ou `ATTRIBUTE`. `operator` aceita `SET` para substituir o valor, `ADD` para acrescentar TYPE/ATTRIBUTE ou `REMOVE` para remover TYPE/ATTRIBUTE. `NAME` aceita somente `SET`; valores de `NAME`/`TYPE` são strings e `ATTRIBUTE` é um enum da §6.1. Mudança de cor/categoria fica bloqueada.
+`GIVE_DON.source_state = "ACTIVE"` is the normal case; `source_state = "RESTED"` is supported only when official text/FAQ authorizes that selection. EB05-057 confirms only the specific scenario addressed. Once attached, DON!! no longer has an active/rested state, according to CR 4-4-2. `GIVE_DON` always uses DON!! from the Cost Area, never DON!! attached to another card. `ADD_DON` moves DON!! from the DON!! Deck to the Cost Area.
 
-`END_GAME` não representa concession: concession não pode ser forçada por carta nem substituída (CR 1-2-4). Representa somente efeito explícito de vitória/derrota (CR 1-2-5).
+`MODIFY_POWER.operator` and `MODIFY_COST.operator` accept `ADD` or `SUBTRACT`. `MODIFY_CHARACTERISTIC.property` accepts only `NAME`, `TYPE`, or `ATTRIBUTE`. `operator` accepts `SET` to replace the value, `ADD` to add a TYPE/ATTRIBUTE, or `REMOVE` to remove a TYPE/ATTRIBUTE. `NAME` accepts only `SET`; `NAME`/`TYPE` values are strings and `ATTRIBUTE` is an enum from §6.1. Changing color/category is blocked.
 
-`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION` e `MODIFY_PROCEDURE` não são operações desta versão. Se o texto exigir uma delas, usar `BLOCKED_CAPABILITY`.
+`END_GAME` does not represent concession: concession cannot be forced by a card or replaced (CR 1-2-4). It represents only an explicit victory/defeat effect (CR 1-2-5).
 
-### 19.2 Semânticas que não podem ser colapsadas
+`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION`, and `MODIFY_PROCEDURE` are not operations in this version. If the text requires one of them, use `BLOCKED_CAPABILITY`.
 
-- K.O. gera o procedimento/evento de K.O.; Trash comum não gera `[On K.O.]`.
-- `MOVE_LIFE_CARD` não causa dano e não oferece Trigger. Trigger só ocorre no procedimento oficial de dano.
-- `PLAY_CARD` processa jogabilidade, custo/isenção, destino e timing de entrada; não é `MOVE_CARD`.
-- DON!! dado a uma carta é diferente de DON!! na Cost Area e de DON!! no DON!! Deck.
-- `MODIFY_POWER` não altera base Power. A redação “set Power to 0” tem semântica própria no CR 4-12 e não é `SET_BASE_POWER` nem `MODIFY_POWER`; como FCL 1.0.0 não possui instrução específica para esse procedimento, fica `BLOCKED_CAPABILITY`.
-- Power pode tornar-se negativo sem mover a carta. Cost efetivo fora de cálculo é tratado como zero se negativo; o valor negativo pode participar de cálculo conforme CR.
-- Negação genérica de efeito, concessão de habilidade, proibição de ação e alteração de procedimento ficam bloqueadas nesta versão; não são aproximadas por remoção de keyword ou por `MOVE_CARD`.
-- `BLOCKER` não é redirecionamento genérico; o motor executa o procedimento da keyword.
+### 19.2 Semantics That Must Not Be Collapsed
 
-## 20. Efeitos contínuos — `continuous`
+- K.O. generates the K.O. procedure/event; ordinary Trash does not generate `[On K.O.]`.
+- `MOVE_LIFE_CARD` does not cause damage or offer Trigger. Trigger occurs only during the official damage procedure.
+- `PLAY_CARD` processes play legality, cost/waiver, destination, and entry timing; it is not `MOVE_CARD`.
+- DON!! attached to a card is different from DON!! in the Cost Area and DON!! in the DON!! Deck.
+- `MODIFY_POWER` does not alter base Power. The wording "set Power to 0" has its own semantics under CR 4-12 and is neither `SET_BASE_POWER` nor `MODIFY_POWER`; because FCL 1.0.0 has no specific instruction for this procedure, it is `BLOCKED_CAPABILITY`.
+- Power may become negative without moving the card. Negative effective Cost is treated as zero outside calculations; the negative value may participate in calculations according to the CR.
+- Generic effect negation, granting abilities, prohibiting actions, and modifying procedures are blocked in this version; they must not be approximated through Keyword removal or `MOVE_CARD`.
+- `BLOCKER` is not generic redirection; the engine executes the Keyword's procedure.
 
-`continuous` representa consequência contínua, não sequência de ações. Exatamente um de `subject` ou `scope` deve identificar onde o efeito se aplica. Campos restantes dependem de `kind`:
+## 20. Continuous Effects — `continuous`
 
-| `kind` | Campos adicionais obrigatórios | Campos opcionais |
-|---|---|---|
-| `MODIFY_POWER` / `MODIFY_COST` | `operator`, `value`, `duration` em Auto/Activate | — |
-| `SET_BASE_POWER` / `SET_BASE_COST` | `value`, `duration` em Auto/Activate | — |
-| `MODIFY_CHARACTERISTIC` | `property`, `operator`, `value`, `duration` em Auto/Activate | — |
-| `GRANT_KEYWORD_EFFECT` / `REMOVE_KEYWORD_EFFECT` | `keyword_effect`, `duration` em Auto/Activate | — |
+`continuous` represents a continuous consequence, not a sequence of actions. Exactly one of `subject` or `scope` must identify where the effect applies. Remaining fields depend on `kind`:
 
-`scope` aceita `{ object = "CARD"|"DON", areas = [AREA_REF, ...], player = PLAYER_REF, filter = CONDITION }`; `player` e `filter` são opcionais. Sem `player`, o escopo inclui todos os jogadores. Em filtros, `subject = { kind = "CANDIDATE" }` representa cada objeto examinado. `subject` é uma referência singular da seção 14. `property` aceita `NAME`, `TYPE` ou `ATTRIBUTE`. `keyword_effect` aceita somente um Keyword Effect listado em §10.1.
+| `kind`                                           | Required additional fields                                   | Optional fields |
+| ------------------------------------------------ | ------------------------------------------------------------ | --------------- |
+| `MODIFY_POWER` / `MODIFY_COST`                   | `operator`, `value`, `duration` in Auto/Activate             | —               |
+| `SET_BASE_POWER` / `SET_BASE_COST`               | `value`, `duration` in Auto/Activate                         | —               |
+| `MODIFY_CHARACTERISTIC`                          | `property`, `operator`, `value`, `duration` in Auto/Activate | —               |
+| `GRANT_KEYWORD_EFFECT` / `REMOVE_KEYWORD_EFFECT` | `keyword_effect`, `duration` in Auto/Activate                | —               |
 
-Em `AUTO`/`ACTIVATE`, `duration` é obrigatório para todo `continuous`; o efeito `PERMANENT` usa `valid_when` opcional (ausente = sempre válido, sujeito às regras de área) e não declara `duration` dentro de `continuous`. `operator` aceita `ADD` ou `SUBTRACT`. `MODIFY_POWER` pode produzir Power negativo; `MODIFY_COST` segue o tratamento do CR para Cost negativo. `SET_BASE_POWER` e `SET_BASE_COST` alteram valores-base e seguem precedência normativa. `valid_when`, quando presente em `PERMANENT`, não se repete dentro de `continuous`.
+`scope` accepts `{ object = "CARD"|"DON", areas = [AREA_REF, ...], player = PLAYER_REF, filter = CONDITION }`; `player` and `filter` are optional. Without `player`, the scope includes all players. In filters, `subject = { kind = "CANDIDATE" }` represents each examined object. `subject` is a singular reference from §14. `property` accepts `NAME`, `TYPE`, or `ATTRIBUTE`. `keyword_effect` accepts only a Keyword Effect listed in §10.1.
 
-`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION` e `MODIFY_PROCEDURE` estão fora do perfil executável 1.0.0. Se o texto exigir uma dessas capacidades, usar `BLOCKED_CAPABILITY`. Replacement Effects continuam sendo exclusivamente `category = "REPLACEMENT"` (§16).
+In `AUTO`/`ACTIVATE`, `duration` is required for every `continuous` effect. A `PERMANENT` effect uses optional `valid_when` (omitted = always valid, subject to area rules) and does not declare `duration` inside `continuous`. `operator` accepts `ADD` or `SUBTRACT`. `MODIFY_POWER` may produce negative Power; `MODIFY_COST` follows the CR's treatment of negative Cost. `SET_BASE_POWER` and `SET_BASE_COST` modify base values and follow normative precedence. When present for `PERMANENT`, `valid_when` is not repeated inside `continuous`.
 
-## 21. Durações admitidas
+`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION`, and `MODIFY_PROCEDURE` are outside the executable 1.0.0 profile. If the text requires any of these capabilities, use `BLOCKED_CAPABILITY`. Replacement Effects remain exclusively `category = "REPLACEMENT"` (§16).
 
-`duration` usa objeto inline com `kind` e campos condicionais:
+## 21. Supported Durations
+
+`duration` uses an inline object with `kind` and conditional fields:
 
 - `THIS_TURN`;
 - `UNTIL_END_OF_TURN`;
 - `UNTIL_END_OF_END_PHASE`;
 - `THIS_BATTLE`;
-- `UNTIL_START_OF_NEXT_TURN` com `player`;
-- `WHILE_VALID` com `condition`;
-- `PERMANENT`, somente quando texto/regra determinar duração sem expiração temporal ordinária.
+- `UNTIL_START_OF_NEXT_TURN` with `player`;
+- `WHILE_VALID` with `condition`;
+- `PERMANENT`, only when the text/rules establish a duration without ordinary temporal expiration.
 
-Não normalizar `THIS_TURN` e `UNTIL_END_OF_TURN`. O motor processa expirações nos marcos oficiais. Não inventar contadores ou eventos de expiração (`next attack`, `next draw`, etc.) não presentes no catálogo.
+Do not normalize `THIS_TURN` and `UNTIL_END_OF_TURN`. The engine processes expirations at official checkpoints. Do not invent counters or expiration events (`next attack`, `next draw`, etc.) that are not in the catalog.
 
-Uma consequência contínua criada por Auto/Activate não desaparece automaticamente porque a carta-fonte saiu do Field; sua validade e duração são avaliadas conforme texto e CR. Permanent Effects dependem da validade da habilidade, com exceções de área somente quando o CR/texto as permitir. O motor aplica a ordem de estabilização de permanentes: Turn Player, depois Non-Turn Player, repetindo quando o estado mudar conforme CR 8-1-3-3-5.
+A continuous consequence created by an Auto/Activate Effect does not automatically disappear because the source card left the Field; its validity and duration are evaluated according to the text and CR. Permanent Effects depend on the ability's validity, with area exceptions only when permitted by the CR/text. The engine applies permanent-effect stabilization in the following order: Turn Player, then Non-Turn Player, repeating when the game state changes as prescribed by CR 8-1-3-3-5.
 
-## 22. Limites de uso
+## 22. Usage Limits
 
-`usage_limit` aceita somente:
+`usage_limit` accepts only:
 
-```toml
+```
 usage_limit = { kind = "ONCE_PER_TURN" }
 ```
 
-A aplicação é por carta/instância, conforme CR 10-2-13. Sair da área e retornar pode produzir uma nova instância para a regra. Se a ativação chegou ao pagamento e o custo se tornou impossível durante seu processamento, `[Once Per Turn]` ainda é consumido e não pode ser ativado novamente naquele turno (CR 10-2-13-5). O motor controla reset, identidade da instância e momento de consumo.
+Application is per card/instance, according to CR 10-2-13. Leaving an area and returning may create a new instance for this rule. If activation reaches the payment stage and the cost becomes impossible during processing, `[Once Per Turn]` is still consumed and cannot be activated again that turn (CR 10-2-13-5). The engine controls reset, instance identity, and the point at which the limit is consumed.
 
-Não admitir `ONCE_PER_BATTLE`, `ONCE_PER_GAME`, `ONCE_PER_PHASE` ou `ONCE_PER_ATTACK` como variantes genéricas.
+Do not admit `ONCE_PER_BATTLE`, `ONCE_PER_GAME`, `ONCE_PER_PHASE`, or `ONCE_PER_ATTACK` as generic variants.
 
-## 23. Regras de validação
+## 23. Validation Rules
 
-Todas as camadas são obrigatórias para compilar.
+All validation layers are mandatory for compilation.
 
-### 23.1 Sintática
+### 23.1 Syntactic
 
-O arquivo deve ser TOML 1.0.0 válido em UTF-8. Erro de parser encerra a validação.
+The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 
-### 23.2 Estrutural
+### 23.2 Structural
 
-- somente tabelas/chaves autorizadas neste documento;
-- tipos de valor corretos; chaves obrigatórias presentes e proibidas ausentes;
-- enumerações reconhecidas;
-- IDs únicos no escopo definido;
-- campos específicos de categoria não misturados;
-- arrays usados onde a ordem importa;
-- parâmetros compatíveis com operação, teste, pagamento e passo;
-- `editorial.extra` é a única área de metadados livres e não executáveis;
-- nenhum `null`, chave duplicada ou tipo TOML fora do perfil.
+- only tables/keys authorized by this document;
+- correct value types; required keys present and prohibited keys absent;
+- recognized enumerations;
+- unique IDs within their defined scope;
+- category-specific fields not mixed;
+- arrays used wherever order matters;
+- parameters compatible with the operation, test, payment, and step;
+- `editorial.extra` is the only area for free-form, non-executable metadata;
+- no `null`, duplicate keys, or TOML types outside the profile.
 
-### 23.3 Referencial
+### 23.3 Referential
 
-- toda referência usa forma autorizada da seção 14;
-- `source_refs`, `replacement.target.rule_ref` e `translation.blockers.references` apontam para IDs existentes em `[source.references]`;
-- referência a seleção aponta para `SELECT` anterior e compatível no mesmo efeito;
-- `depends_on` aponta para passo anterior compatível;
-- área identifica jogador e nome válidos;
-- propriedade/estado é aplicável ao objeto;
-- não existe acesso arbitrário por ID de instância.
+- every reference uses an authorized form from §14;
+- `source_refs`, `replacement.target.rule_ref`, and `translation.blockers.references` point to existing IDs in `[source.references]`;
+- selection references point to a compatible earlier `SELECT` in the same effect;
+- `depends_on` points to a compatible previous step;
+- area identifies a valid player and name;
+- property/state is applicable to the object;
+- no arbitrary instance-ID access.
 
-### 23.4 Semântico
+### 23.4 Semantic
 
-- categoria, timing e janela corretos;
-- condições no contexto/momento corretos;
-- custo separado da resolução;
-- seleção preserva objeto, área, filtro, cardinalidade, escolhedor e informação;
-- escolha de modo separada de seleção;
-- executor separado de escolhedor;
-- `if`, `then` e `if you do` distintos;
-- operações correspondem a procedimentos oficiais;
-- ordem e simultaneidade preservadas;
-- efeitos contínuos têm sujeito/escopo, validade e duração;
-- Replacement Effect contém todos os elementos exigidos em §16;
-- K.O., Trash, dano, Life, Trigger, jogar carta e DON!! −X continuam distintos;
-- qualquer semântica não demonstrada resulta em bloqueio.
+- correct category, timing, and window;
+- conditions evaluated in the correct context and at the correct time;
+- cost separated from resolution;
+- selection preserves object, area, filter, cardinality, chooser, and information;
+- mode choice separated from selection;
+- executor separated from chooser;
+- `if`, `then`, and `if you do` remain distinct;
+- operations correspond to official procedures;
+- ordering and simultaneity preserved;
+- continuous effects have subject/scope, validity, and duration;
+- Replacement Effects contain every element required by §16;
+- K.O., Trash, damage, Life, Trigger, playing a card, and DON!! −X remain distinct;
+- any semantics that cannot be substantiated result in blocking.
 
-### 23.5 Normativa
+### 23.5 Normative
 
-Interpretação que dependa de CR, FAQ ou errata deve ser rastreável por `source_refs` ou `translation.blockers.references`. FAQ específica não pode ser generalizada para além do caso respondido. Texto `raw_text` nunca prevalece sobre o texto oficial vigente `current_text`.
+Interpretations that depend on the CR, FAQ, or errata must be traceable through `source_refs` or `translation.blockers.references`. A specific FAQ must not be generalized beyond the case it addresses. `raw_text` never takes precedence over the current official text in `current_text`.
 
-## 24. Política de bloqueio
+## 24. Blocking Policy
 
-Estados possíveis são definidos na seção 8. A LLM tradutora deve bloquear quando não puder provar, a partir do texto vigente e das fontes aplicáveis:
+Possible states are defined in §8. The translating LLM must block whenever it cannot establish, from the current text and applicable sources:
 
-- jogador, owner, controller, escolhedor, executor ou afetado;
-- timing, janela, condição ou momento de avaliação;
-- objeto designado, seleção, cardinalidade ou informação disponível;
-- seleção aleatória, quando o perfil não fornecer construção específica;
-- ordem, simultaneidade ou dependência;
-- custo, pagamento ou opcionalidade;
-- processamento substituído, ponto, parte substituída ou procedimento substituto;
-- validade, escopo ou duração;
-- consequência de `if you do`;
-- identidade da carta/instância ou versão de texto aplicável.
+- player, owner, controller, chooser, executor, or affected player;
+- timing, window, condition, or evaluation point;
+- designated object, selection, cardinality, or available information;
+- random selection, when the profile does not provide a specific construct;
+- order, simultaneity, or dependency;
+- cost, payment, or optionality;
+- replaced processing, application point, replaced part, or replacement procedure;
+- validity, scope, or duration;
+- the consequence of `if you do`;
+- card/instance identity or applicable text version.
 
-`BLOCKED_NORMATIVE` significa que falta fundamento ou esclarecimento oficial. `BLOCKED_CAPABILITY` significa que a semântica é conhecida, mas o perfil 1.0.0 não possui construção para representá-la. `INVALID_SOURCE` significa que texto, errata, idioma/região ou dados de origem são insuficientes/inconsistentes.
+`BLOCKED_NORMATIVE` means that normative support or official clarification is missing. `BLOCKED_CAPABILITY` means that the semantics are known, but the 1.0.0 profile has no construct to represent them. `INVALID_SOURCE` means that the text, errata, language/region, or source data are insufficient or inconsistent.
 
-Nenhum bloqueio pode ser convertido em operação vazia, valor padrão, ramo aproximado ou omissão de texto. A LLM nunca inventa enumeração, opcode, propriedade, jogador ou exceção.
+No blocker may be converted into an empty operation, default value, approximated branch, or omitted text. The LLM must never invent an enumeration, opcode, property, player, or exception.
 
-## 25. Versionamento e compatibilidade
+## 25. Versioning and Compatibility
 
-- `language_version` identifica estrutura textual, catálogo e semântica de FCL. A versão desta especificação e da linguagem é `1.0.0`; não há versão semântica independente.
-- Campos desconhecidos são rejeitados, exceto chaves escalares em `[editorial.extra]`.
-- Mudança incompatível de estrutura, enumeração, tipo ou significado exige nova versão principal.
-- Extensão compatível sem alterar significado existente exige nova versão menor.
-- Correção textual sem mudança de semântica pode receber versão patch do documento, mas não altera `language_version`.
-- Mudança que altere significado de construção exige nova versão da linguagem.
-- Compilador rejeita versão que não declara suportar; nunca reinterpreta silenciosamente.
+- `language_version` identifies FCL's textual structure, catalog, and semantics. The version of this specification and the language is `1.0.0`; there is no independent semantic version.
+- Unknown fields are rejected, except for scalar keys in `[editorial.extra]`.
+- Incompatible changes to structure, enumeration, type, or meaning require a new major version.
+- A compatible extension that does not change existing meanings requires a new minor version.
+- A textual correction that does not change semantics may receive a patch version of the document, but does not change `language_version`.
+- A change that alters the meaning of a construct requires a new language version.
+- The compiler rejects versions it does not declare support for; it must never silently reinterpret them.
 
-## 26. Exemplos de referência
+## 26. Reference Examples
 
-Os exemplos seguintes demonstram a estrutura TOML. São exemplos sintáticos, não substituem auditoria da carta e das regras.
+The following examples demonstrate TOML structure. They are syntactic examples and do not replace auditing the card and its rules.
 
-### 26.1 Permanent Effect simples
+### 26.1 Simple Permanent Effect
 
-```toml
+```
 format = "FL_CARD_LANGUAGE"
 language_version = "1.0.0"
 
@@ -956,9 +970,9 @@ scope = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER",
 continuous = { kind = "MODIFY_POWER", operator = "ADD", value = { literal = 1000 } }
 ```
 
-### 26.2 Auto Effect com resolução ordenada (fragmento)
+### 26.2 Auto Effect with Ordered Resolution (Fragment)
 
-```toml
+```
 [[abilities]]
 id = "A2"
 source_text = "On Play: Draw 1 card."
@@ -974,9 +988,9 @@ resolution = [
 ]
 ```
 
-### 26.3 Condição de resolução após um passo anterior
+### 26.3 Resolution Condition After a Previous Step
 
-```toml
+```
 resolution = [
   { id = "S1", kind = "SELECT", object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }], quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "OWNER_PRIVATE_INFORMATION" },
   { id = "S2", kind = "OPERATION", operation = "TRASH_HAND", player = { kind = "PLAYER", role = "YOU" }, selection = "S1" },
@@ -986,11 +1000,11 @@ resolution = [
 ]
 ```
 
-A condição é consultada no ponto em que o nó `IF` é processado. Esse exemplo não concede licença para congelar o estado no início da resolução.
+The condition is evaluated when the `IF` node is processed. This example does not authorize freezing the game state at the beginning of resolution.
 
-### 26.4 Replacement Effect de Activation Cost
+### 26.4 Activation Cost Replacement Effect
 
-```toml
+```
 [[abilities]]
 id = "A3"
 source_text = "You may trash 1 card from your hand instead of paying the activation cost."
@@ -1038,13 +1052,13 @@ player = { kind = "PLAYER", role = "YOU" }
 selection = "R1"
 ```
 
-O exemplo só pode ser usado quando o texto vigente, a regra e o contexto da carta efetivamente suportarem essa substituição. A regra CR 8-3-1-7 determina a consequência para o efeito cujo Activation Cost foi substituído. A seleção e a operação constituem o procedimento substituto; não são declaradas como um Activation Cost adicional.
+The example may be used only when the current text, rules, and card context actually support this replacement. CR 8-3-1-7 determines the consequence for the effect whose Activation Cost was replaced. The selection and operation constitute the replacement procedure; they are not declared as an additional Activation Cost.
 
-### 26.5 Auto Effect de Trigger
+### 26.5 Trigger Auto Effect
 
-Exemplo estrutural para uma carta não-Event cujo texto de Trigger executa um efeito próprio:
+Structural example for a non-Event card whose Trigger text executes its own effect:
 
-```toml
+```
 [[abilities]]
 id = "A4"
 source_text = "[Trigger] Draw 1 card."
@@ -1061,127 +1075,125 @@ resolution = [
 ]
 ```
 
-O motor oferece a ativação durante o processamento de dano de Life. Este exemplo é um fragmento; os metadados de carta/fonte e o estado de tradução devem constar no arquivo completo.
+The engine offers activation during Life damage processing. This is a fragment; card/source metadata and translation status must be present in the complete file.
 
-### 26.6 Event com Trigger que ativa a própria carta
+### 26.6 Event with a Trigger That Activates the Card Itself
 
-Para texto `[Trigger] Activate this card.`, usar `keyword_effects = ["TRIGGER"]` e `event_activation = { window = "TRIGGER" }`. A habilidade normal da Event é declarada separadamente como `ACTIVATE` com `activation_window = "EVENT_CARD_RESOLUTION"`. Não criar uma operação `MOVE_CARD` para simular a ativação.
+For `[Trigger] Activate this card.`, use `keyword_effects = ["TRIGGER"]` and `event_activation = { window = "TRIGGER" }`. The Event's normal ability is declared separately as `ACTIVATE` with `activation_window = "EVENT_CARD_RESOLUTION"`. Do not create a `MOVE_CARD` operation to simulate activation.
 
-## 27. Conformidade
+## 27. Conformance
 
-Um programa é conforme com FCL 1.0.0 somente quando:
+A program conforms to FCL 1.0.0 only when:
 
-1. é TOML 1.0.0 válido;
-2. usa `format = "FL_CARD_LANGUAGE"` e `language_version = "1.0.0"`;
-3. respeita integralmente estrutura, vocabulários e invariantes deste documento;
-4. passa validações sintática, estrutural, referencial, semântica e normativa;
-5. não contém habilidade de gameplay bloqueada;
-6. não contém campos desconhecidos fora de `[editorial.extra]`.
+1. it is valid TOML 1.0.0;
+2. it uses `format = "FL_CARD_LANGUAGE"` and `language_version = "1.0.0"`;
+3. it fully complies with the structure, vocabularies, and invariants in this document;
+4. it passes syntactic, structural, referential, semantic, and normative validation;
+5. it contains no blocked gameplay abilities;
+6. it contains no unknown fields outside `[editorial.extra]`.
 
-`SUPPORTED` é conclusão de tradução, não prova de que a VM implementa todas as regras do jogo. Conformidade do programa, cobertura do compilador e cobertura do motor são três verificações distintas.
+`SUPPORTED` is a translation conclusion, not proof that the VM implements every game rule. Program conformance, compiler coverage, and engine coverage are three distinct checks.
 
-## 28. Congelamento da versão 1.0.0
+## 28. Version 1.0.0 Freeze
 
-FCL 1.0.0 congela:
+FCL 1.0.0 freezes:
 
-- TOML 1.0.0 como formato textual;
-- um arquivo por identidade lógica de carta;
-- separação entre identidade, fonte normativa, tradução, editorial e habilidades;
-- as quatro categorias normativas, incluindo Replacement Effect de primeira classe;
-- condições, referências, valores, seleções, escolhas, custos, resolução, operações, contínuos, durações e limites de uso aqui enumerados;
-- o tratamento do Trigger e de Event card activation;
-- a estrutura completa de Replacement Effects incorporada na seção 16;
-- validação estrita e bloqueio de construções não suportadas.
+- TOML 1.0.0 as the textual format;
+- one file per logical card identity;
+- separation of identity, normative sources, translation, editorial data, and abilities;
+- the four normative categories, including first-class Replacement Effects;
+- the conditions, references, values, selections, choices, costs, resolution structures, operations, continuous effects, durations, and usage limits enumerated herein;
+- Trigger and Event card activation handling;
+- the complete Replacement Effect structure incorporated into §16;
+- strict validation and blocking of unsupported constructs.
 
-Esta versão está **congelada para iniciar testes de tradução de cartas reais**. Ela não declara que todas as cartas do jogo sejam traduzíveis nem que a Rules Engine esteja pronta. Casos fora do perfil permanecem bloqueados; não alteram silenciosamente a versão congelada.
+This version is frozen and ready for real card translation testing. It does not declare that every card in the game can be translated or that the Rules Engine is ready. Cases outside the profile remain blocked; they do not silently change the frozen version.
 
-Para mudar semântica ou estrutura, abrir proposta de extensão, registrar carta/texto/regra que exige a capacidade, demonstrar por que as construções existentes são insuficientes, definir a interação com o perfil atual e publicar nova versão. Não editar o significado de FCL 1.0.0 durante a tradução de cartas.
+To change semantics or structure, open an extension proposal, document the card/text/rule requiring the capability, demonstrate why existing constructs are insufficient, define its interaction with the current profile, and publish a new version. Do not edit the meaning of FCL 1.0.0 during card translation.
 
-## 29. Fronteira do motor e semântica normativa complementar
+## 29. Engine Boundaries and Additional Normative Semantics
 
-Esta seção consolida as responsabilidades que pertencem ao motor e não são instruções FCL.
+This section consolidates responsibilities belonging to the engine rather than FCL instructions.
 
-### 29.1 Identidade e papéis
+### 29.1 Identity and Roles
 
-A carta impressa (card number/texto vigente) não é a instância em jogo. Uma instância tem área, owner, controller/contexto, estado, relações com DON!! e histórico regulamentar. Mudança de área pode criar nova instância para efeitos específicos; o card number não substitui identidade de instância.
+The printed card (card number/current text) is not the in-game instance. An instance has an area, owner, controller/context, state, DON!! relationships, and regulatory history. Changing areas may create a new instance for specific effects; the card number does not replace instance identity.
 
-Referências aceitas: `SOURCE`, `EVENT_OBJECT`, `PLAYER`, `AREA`, `SELECTED_OBJECT`, `SELECTED_SET`, `TEXT_DESIGNATED_OBJECT`, `ATTACKER`, `ATTACK_TARGET`, `BATTLE` e `TOP_CARD`. Papéis: `YOU`, `OPPONENT`, `TURN_PLAYER`, `NON_TURN_PLAYER`, `CONTEXT_PLAYER`, `OWNER`, `CONTROLLER`, `ACTIVATOR`, `CHOOSER`, `EXECUTOR` e `AFFECTED`. `YOU` nunca é substituto universal de owner, controller, Turn Player ou ativador. `OWNER`/`CONTROLLER` são relativos ao objeto contextual. `TEXT_DESIGNATED_OBJECT.designation` reproduz expressão literal de `source_text` e precisa identificar uma única instância. `NONE` não é área.
+Accepted references: `SOURCE`, `EVENT_OBJECT`, `PLAYER`, `AREA`, `SELECTED_OBJECT`, `SELECTED_SET`, `TEXT_DESIGNATED_OBJECT`, `ATTACKER`, `ATTACK_TARGET`, `BATTLE`, and `TOP_CARD`. Roles: `YOU`, `OPPONENT`, `TURN_PLAYER`, `NON_TURN_PLAYER`, `CONTEXT_PLAYER`, `OWNER`, `CONTROLLER`, `ACTIVATOR`, `CHOOSER`, `EXECUTOR`, and `AFFECTED`. `YOU` is never a universal substitute for owner, controller, Turn Player, or activator. `OWNER`/`CONTROLLER` are relative to the contextual object. `TEXT_DESIGNATED_OBJECT.designation` reproduces a literal expression from `source_text` and must identify a single instance. `NONE` is not an area.
 
-Áreas: `DECK`, `DON_DECK`, `HAND`, `TRASH`, `LEADER_AREA`, `CHARACTER_AREA`, `STAGE_AREA`, `COST_AREA`, `LIFE_AREA`. Leader, Character, Stage e Cost Areas formam o Field. Estados: `ACTIVE`, `RESTED`; faces: `FACE_UP`, `FACE_DOWN`; posições: `TOP`, `BOTTOM`, `NORMAL` quando autorizada.
+Areas: `DECK`, `DON_DECK`, `HAND`, `TRASH`, `LEADER_AREA`, `CHARACTER_AREA`, `STAGE_AREA`, `COST_AREA`, `LIFE_AREA`. Leader, Character, Stage, and Cost Areas make up the Field. States: `ACTIVE`, `RESTED`; faces: `FACE_UP`, `FACE_DOWN`; positions: `TOP`, `BOTTOM`, `NORMAL` when authorized.
 
-DON!! no DON!! Deck, na Cost Area e anexado a uma carta são posições distintas. DON!! anexado não é active nem rested (CR 4-4-2), não está disponível na Cost Area e não pode ser transferido diretamente entre cartas. Quando a carta-hospedeira sai do Field, o procedimento de retorno de DON!! pertence ao motor.
+DON!! in the DON!! Deck, in the Cost Area, and attached to a card are distinct positions. Attached DON!! is neither active nor rested (CR 4-4-2), is not available in the Cost Area, and cannot be transferred directly between cards. When the host card leaves the Field, the DON!! return procedure belongs to the engine.
 
-### 29.2 Eventos, ativação e ordem
+### 29.2 Events, Activation, and Ordering
 
-Evento é um acontecimento contextual do jogo; timing é o ponto regulamentar em que uma habilidade pode ativar. O motor gera eventos e timings. FCL declara apenas timings do catálogo da seção 11. Condições de turno como `YOUR_TURN`/`OPPONENT_TURN` são condições, não eventos.
+An event is a contextual game occurrence; timing is the regulatory point at which an ability may activate. The engine generates events and timings. FCL declares only timings from the §11 catalog. Turn conditions such as `YOUR_TURN`/`OPPONENT_TURN` are conditions, not events.
 
-Auto Effect distingue timing satisfeito, efeito pendente, ativação efetiva e resolução. Se a origem que satisfez o timing mudar de área antes da ativação, o Auto Effect não ativa (CR 8-1-3-1-3). Efeito já ativado/resolvido que criou consequência contínua segue sua validade/duração; sair da área não o apaga automaticamente.
+Auto Effect distinguishes satisfied timing, pending effect, actual activation, and resolution. If the source that satisfied the timing changes areas before activation, the Auto Effect does not activate (CR 8-1-3-1-3). An already activated/resolved effect that created a continuous consequence follows its validity/duration; leaving the area does not automatically erase it.
 
-`[On K.O.]` só é gerado pelo procedimento de K.O. definido pelo CR. Enviar uma carta à Trash por outro meio não gera esse timing automaticamente.
+`[On K.O.]` is generated only by the K.O. procedure defined by the CR. Sending a card to the Trash by another means does not automatically generate this timing.
 
-`[Trigger]` só é oferecido durante o processamento oficial de dano de Life, no lugar de adicionar a carta à mão. Se o jogador não ativar, o processamento normal continua; se ativar, a resolução do Trigger ocorre no ponto regulamentar e a carta segue o destino previsto pelo procedimento. Se efeito ou Replacement Effect impedir a adição à mão, o Trigger não pode ser ativado (CR 4-6-3-1). Mover uma carta para/da Life por efeito comum não oferece Trigger. Em Double Attack, o dano/Trigger é processado ponto a ponto conforme o CR.
+`[Trigger]` is offered only during official Life damage processing, in place of adding the card to the hand. If the player does not activate it, normal processing continues; if activated, Trigger resolution occurs at the prescribed point and the card follows the destination specified by the procedure. If an effect or Replacement Effect prevents the card from being added to the hand, Trigger cannot be activated (CR 4-6-3-1). Moving a card to/from Life through an ordinary effect does not offer Trigger. With Double Attack, damage/Trigger is processed point by point according to the CR.
 
-Ativar Event card e ativar efeito de uma carta são atos diferentes. `[Main]`/`[Counter]` de Event são janelas de ativação da carta; texto que resolve depois da ativação é representado separadamente. Blocker, Counter, batalha, fases e prioridades são procedimentos do motor.
+Activating an Event card and activating an effect of a card are different actions. `[Main]`/`[Counter]` on an Event are activation windows for the card; text that resolves after activation is represented separately. Blocker, Counter, battle, phases, and priority are engine procedures.
 
-### 29.3 Condições, seleção e informação
+### 29.3 Conditions, Selection, and Information
 
-Condição de ativação, condição de validade contínua, condição de resolução e filtro de seleção são contextos distintos. Condições de ativação são verificadas antes da ativação; condições de resolução são avaliadas no momento exigido pelo texto/CR, podendo observar alterações feitas por passos anteriores. Não presumir snapshot do estado no início da resolução.
+Activation conditions, continuous validity conditions, resolution conditions, and selection filters are distinct contexts. Activation conditions are checked before activation; resolution conditions are evaluated at the point required by the text/CR and may observe changes made by previous steps. Do not assume a snapshot of the state at the beginning of resolution.
 
-Seleção identifica objetos elegíveis; não os move, revela ou afeta. Quantidade fixa não é `UP_TO`; `UP_TO` permite zero quando autorizado. O procedimento `DRAW UP TO X` permite parar antes de cada compra. Um objeto designado pelo texto ausente não é o mesmo que uma seleção vazia. Áreas secretas obedecem ao procedimento de informação do CR; olhar, revelar e escolher são decisões diferentes.
+Selection identifies eligible objects; it does not move, reveal, or affect them. A fixed quantity is not `UP_TO`; `UP_TO` allows zero when authorized. The `DRAW UP TO X` procedure allows the player to stop before each draw. An object designated by the text but absent is not the same as an empty selection. Secret areas follow the CR's information procedures; looking, revealing, and choosing are distinct actions.
 
-Quando múltiplos jogadores precisam escolher simultaneamente, o Turn Player escolhe primeiro. Quando múltiplas cartas são colocadas simultaneamente numa área, o owner decide a ordem nos termos do CR, salvo regra/texto diferente.
+When multiple players must make choices simultaneously, the Turn Player chooses first. When multiple cards are simultaneously placed in an area, the owner determines their order under the CR, unless a different rule/text applies.
 
-### 29.4 Resolução e impossibilidade
+### 29.4 Resolution and Impossibility
 
-A resolução segue a ordem textual. Ação impossível não acontece; não existe rollback geral das ações anteriores. A consequência sobre passos posteriores depende da estrutura e do CR. `IF`, `THEN` e `IF_YOU_DO` permanecem distintos. Instruções independentes continuam quando o texto/CR as torna independentes.
+Resolution follows textual order. An impossible action does not occur; there is no general rollback of previous actions. Consequences for subsequent steps depend on the structure and the CR. `IF`, `THEN`, and `IF_YOU_DO` remain distinct. Independent instructions continue when the text/CR makes them independent.
 
-Custo de jogar carta é distinto de Activation Cost. Se custo é impossível antes da ativação, o efeito não ativa. Se pagamento se torna impossível durante processamento após a ativação, paga-se o máximo possível, a resolução não ocorre e o limite `[Once Per Turn]` é consumido quando aplicável. Custo voluntário recusado impede ativação. Escolha de modo, seleção `UP_TO` e ação opcional durante resolução não são custos.
+The cost to play a card is distinct from Activation Cost. If a cost is impossible before activation, the effect does not activate. If payment becomes impossible during processing after activation, pay as much as possible, resolution does not occur, and `[Once Per Turn]` is consumed when applicable. Declining a voluntary cost prevents activation. Mode choice, `UP_TO` selection, and optional actions during resolution are not costs.
 
-### 29.5 Efeitos contínuos, negação e proibição
+### 29.5 Continuous Effects, Negation, and Prohibition
 
-Permanent Effect permanece válido enquanto a condição e as regras permitirem. Alguns efeitos “according to/under the rules” podem permanecer válidos em área secreta; só se aplica quando texto/CR identificar a exceção. Efeitos contínuos são aplicados/estabilizados pelo motor na ordem Turn Player, Non-Turn Player e repetição se o estado mudar (CR 8-1-3-3-5).
+A Permanent Effect remains valid while its condition and the rules permit it. Some effects phrased as "according to/under the rules" may remain valid in secret areas; this applies only when the text/CR identifies the exception. Continuous effects are applied/stabilized by the engine in Turn Player, Non-Turn Player order, repeating if the game state changes (CR 8-1-3-3-5).
 
-Proibição de ação, negação/invalidação de efeito e impossibilidade de uma operação são fenômenos diferentes. FCL 1.0.0 não possui instruções genéricas para os dois primeiros; quando o texto exigir esses comportamentos, bloquear. A VM não deve simulá-los com remoção de keyword ou operação de movimento.
+Prohibiting an action, negating/invalidating an effect, and an operation being impossible are different phenomena. FCL 1.0.0 has no generic instructions for the first two; when the text requires these behaviors, block translation. The VM must not simulate them through Keyword removal or movement operations.
 
-### 29.6 Keywords e procedimentos próprios
+### 29.6 Keywords and Their Own Procedures
 
-Keyword Effects do perfil: Rush, Double Attack, Banish, Blocker, Trigger, Rush: Character e Unblockable. Cada termo chama procedimento oficial. Outros Keywords são codificados pela função: `ON_PLAY`, `ON_KO`, `WHEN_ATTACKING`, `ON_BLOCK`, `ON_OPPONENT_ATTACK`, `MAIN`, `COUNTER`, `DON!! xX`, `DON!! −X`, `YOUR_TURN`, `OPPONENT_TURN`, `ONCE_PER_TURN` e `TRASH`.
+Keyword Effects in the profile: Rush, Double Attack, Banish, Blocker, Trigger, Rush: Character, and Unblockable. Each term invokes its official procedure. Other Keywords are encoded according to their function: `ON_PLAY`, `ON_KO`, `WHEN_ATTACKING`, `ON_BLOCK`, `ON_OPPONENT_ATTACK`, `MAIN`, `COUNTER`, `DON!! xX`, `DON!! −X`, `YOUR_TURN`, `OPPONENT_TURN`, `ONCE_PER_TURN`, and `TRASH`.
 
-A linguagem não fornece operação genérica para transferir controle, copiar qualquer efeito, redirecionar ataque, cancelar ataque/batalha, modificar arbitrariamente regras do motor ou repetir resolução sem limite. Blocker não é redirecionamento genérico; encerramento de batalha é consequência do procedimento de batalha.
+The language does not provide a generic operation to transfer control, copy any effect, redirect attacks, cancel attacks/battles, arbitrarily modify engine rules, or repeat resolution indefinitely. Blocker is not generic redirection; ending a battle is a consequence of the battle procedure.
 
-### 29.7 Casos FAQ incorporados e limite
+### 29.7 Incorporated FAQ Cases and Boundary
 
-As FAQs abaixo foram incorporadas somente nos casos perguntados; não devem ser generalizadas além deles:
+The following FAQs have been incorporated only for the cases they address; they must not be generalized beyond those cases:
 
-- `EB05-006`: olhar o topo da Life antes de escolher um dos modos é permitido no caso perguntado.
-- `EB05-008`: efeito Counter com `up to 1` pode ser ativado sem Character no Field.
-- `EB05-011`: a condição específica de On Play não é satisfeita quando a carta do topo da Life já está face-down no caso perguntado.
-- `EB05-028`: o oponente do ativador escolhe as quatro cartas da própria mão para Trash.
-- `EB05-033`: o requisito de tipo do Leader e diferença de DON!! do Field é condição obrigatória.
-- `EB05-034`: a condição posterior é avaliada depois do DON!! −2 e pode deixar de ser satisfeita.
-- `EB05-045`: On Play pode K.O. a própria fonte e, no caso perguntado, pode escolher não K.O. nenhuma carta.
-- `EB05-046`: a contagem de Trash pode ser avaliada depois do descarte realizado no passo anterior.
-- `EB05-052`: a substituição de dano de Gloriosa abrange os três cenários respondidos: dano de batalha com zero Life, ambos os danos de Double Attack e dano por efeito.
-- `EB05-057`: permite anexar DON!! rested, retirado da Cost Area, no cenário específico de Leader/Character com múltiplos Attributes incluindo Special ou Wisdom. `GIVE_DON.source_state` registra o estado antes do anexo; o DON!! anexado passa a não ser active nem rested (CR 4-4-2). A FAQ não cria permissão geral.
-- `EB05-059`: a imunidade à K.O. em batalha não se aplica no cenário específico respondido.
-- `EB05-061`: a substituição de Nami pode ser usada quando a própria fonte seria removida, mas não no cenário sem Life para realizar a consequência.
-- `EB05-010`: negação de Blocker impresso, concedido continuamente ou por Trigger tem o tratamento específico descrito pela FAQ.
-- `EB05-021`: On Play de Character jogado pelo efeito não encadeia automaticamente outro On Play no cenário respondido.
+- `EB05-006`: Looking at the top Life card before choosing one of the modes is permitted in the specific case addressed.
+- `EB05-008`: A Counter Effect with `up to 1` may be activated even when there is no Character on the Field.
+- `EB05-011`: The specific On Play condition is not satisfied when the top Life card is already face-down in the case addressed.
+- `EB05-028`: The activator's opponent chooses the four cards from their own hand to Trash.
+- `EB05-033`: The Leader type requirement and the difference in DON!! in the Field are mandatory conditions.
+- `EB05-034`: The subsequent condition is evaluated after DON!! −2 and may no longer be satisfied.
+- `EB05-045`: On Play may K.O. its own source and, in the case addressed, may choose not to K.O. any card.
+- `EB05-046`: Trash count may be evaluated after the discard performed in the previous step.
+- `EB05-052`: Gloriosa's damage replacement covers the three scenarios addressed: battle damage with zero Life, both instances of Double Attack damage, and damage from an effect.
+- `EB05-057`: Allows rested DON!! taken from the Cost Area to be attached in the specific scenario involving a Leader/Character with multiple Attributes, including Special or Wisdom. `GIVE_DON.source_state` records the state before attachment; attached DON!! becomes neither active nor rested (CR 4-4-2). This FAQ does not create general permission.
+- `EB05-059`: Immunity to K.O. in battle does not apply in the specific scenario addressed.
+- `EB05-061`: Nami's replacement may be used when its own source would be removed, but not in the scenario where there is no Life to perform the consequence.
+- `EB05-010`: Negation of printed, continuously granted, or Trigger-granted Blocker follows the specific treatment described by the FAQ.
+- `EB05-021`: On Play of a Character played by an effect does not automatically chain into another On Play in the scenario addressed.
 
-Questões gerais ainda não cobertas, incluindo FAQs históricos não verificados, reconciliação integral de erratas, custo de substituições coletivas, interações complexas de Replacement Effects, momentos de avaliação não esclarecidos, efeitos em áreas secretas, loops e conflitos regionais/idioma, continuam sendo limites do perfil. Caso concreto dependente de uma resposta não verificada fica `BLOCKED_NORMATIVE`. Custo coletivo de substituições permanece deliberadamente sem regra genérica.
+General questions not yet covered, including unverified historical FAQs, complete errata reconciliation, collective replacement costs, complex Replacement Effect interactions, unclear evaluation points, effects in secret areas, loops, and regional/language conflicts, remain outside the profile. A specific case depending on an unverified answer must be `BLOCKED_NORMATIVE`. Collective replacement costs deliberately remain without a generic rule.
 
----
+## Official References
 
-## Referências oficiais
+- TOML 1.0.0: [https://toml.io/en/v1.0.0](https://toml.io/en/v1.0.0?utm_source=chatgpt.com)
+- ONE PIECE CARD GAME Comprehensive Rules v1.2.1, updated August 28, 2026: [https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf?20260828=](https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf?20260828\&utm_source=chatgpt.com)
+- Official Rules and Errata Index: [https://en.onepiece-cardgame.com/rules/](https://en.onepiece-cardgame.com/rules/?utm_source=chatgpt.com)
+- Official FAQ Index: [https://en.onepiece-cardgame.com/rules/faq/](https://en.onepiece-cardgame.com/rules/faq/?utm_source=chatgpt.com)
+- Official EB-05 FAQ, updated November 6, 2026: [https://en.onepiece-cardgame.com/pdf/qa_eb05.pdf?20261106=](https://en.onepiece-cardgame.com/pdf/qa_eb05.pdf?20261106\&utm_source=chatgpt.com)
 
-- TOML 1.0.0: https://toml.io/en/v1.0.0
-- *ONE PIECE CARD GAME Comprehensive Rules* v1.2.1, atualizado em 28/08/2026: https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf?20260828=
-- Índice oficial de Rules e erratas: https://en.onepiece-cardgame.com/rules/
-- Índice oficial de FAQs: https://en.onepiece-cardgame.com/rules/faq/
-- FAQ oficial EB-05, atualizada em 06/11/2026: https://en.onepiece-cardgame.com/pdf/qa_eb05.pdf?20261106=
+## Certification Boundary
 
-## Limite de certificação
+This document establishes a conservative profile of supported constructs. It does not certify that every card, every historical FAQ, every erratum, or every possible interaction has been audited. The criterion is: behavior defined by the profile may be translated; behavior that depends on an unverified rule or a missing construct must be blocked.
 
-Este documento fecha um perfil conservador de construções suportadas. Não certifica que todas as cartas, todas as FAQs históricas, todas as erratas ou todas as interações possíveis foram auditadas. O critério é: comportamento definido pelo perfil pode ser traduzido; comportamento que dependa de regra não verificada ou construção ausente deve ser bloqueado.
-
-**Regra final:** a LLM interpreta e declara; o validador verifica a estrutura e as restrições; o compilador transforma somente programas `SUPPORTED`; a VM executa instruções válidas; a Rules Engine aplica os procedimentos oficiais. Nenhuma dessas etapas pode inventar semântica.
+Final Rule: The LLM interprets and declares; the validator checks structure and constraints; the compiler transforms only `SUPPORTED` programs; the VM executes valid instructions; the Rules Engine applies the official procedures. None of these stages may invent semantics.
