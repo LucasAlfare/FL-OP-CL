@@ -1,8 +1,7 @@
-# FL Card Language (FCL) — Specification 1.3.0
+# FL Card Language (FCL) — Specification 1.4.0
 
-**Textual Format:** TOML 1.0.0\
-**Specification and Language Version:** 1.3.0\
-**Freeze Date:** November 9, 2026\
+**Textual Format:** TOML
+**Freeze Date:** November 9, 2026
 **Status:** `FROZEN — READY FOR CARD-TRANSLATION TESTING`
 
 ---
@@ -13,11 +12,11 @@ The FL Card Language (FCL) is a declarative language for describing One Piece Ca
 
 The card declares its specific behavior; the official rules define the procedures and consequences; the engine executes those procedures. FCL is not a general-purpose language. It does not contain Kotlin code, user-defined functions, callbacks, mutable variables, unrestricted loops, recursion, or arbitrary access to game state.
 
-Version 1.3.0 defines, in a single document, the canonical TOML format, the closed semantic profile, vocabularies, Replacement Effect structure, payment structures, LOOK-result manipulation, attack-target permissions, battle K.O. prevention, validation rules, and blocking policy. This document supersedes any previous specification, semantic contract, or addendum for FCL 1.3.0. No external document needs to be combined with it.
+Version 1.4.0 defines, in a single document, the canonical TOML format, the closed semantic profile, vocabularies, Replacement Effect structure, payment structures, LOOK-result manipulation, attack-target permissions, battle K.O. prevention, Character-to-owner-hand payments, validation rules, and blocking policy. This document supersedes any previous specification, semantic contract, or addendum for FCL 1.4.0. No external document needs to be combined with it.
 
 The external lexical and syntactic grammar is TOML 1.0.0. FCL adds a closed profile of tables, fields, types, enumerations, and semantic invariants. `language_version` identifies the structure and meaning of the constructs used by a card program. There is no separate semantic-profile field.
 
-Version 1.3.0 is an additive extension of 1.2.0. Existing 1.2.0, 1.1.0, and 1.0.0 constructs retain their original meanings. Existing documents do not need to be rewritten merely because this specification has been updated. New constructs introduced in 1.3.0 require `language_version = "1.3.0"`.
+Version 1.4.0 is an additive extension of 1.3.0. Existing 1.3.0, 1.2.0, 1.1.0, and 1.0.0 constructs retain their original meanings. Existing documents do not need to be rewritten merely because this specification has been updated. New constructs introduced in 1.4.0 require `language_version = "1.4.0"`.
 
 `FROZEN` means that the contract for this version is closed and ready for card translation and testing to begin. It does not mean that every published card is supported, that the compiler/VM already exists, or that every game interaction has been implemented. Any behavior outside this profile must be blocked rather than approximated. Structural or semantic changes require a new version.
 
@@ -39,6 +38,7 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - optional activation-cost payments;
 - Life-to-hand payments;
 - hand-to-bottom-of-Deck payments;
+- Character-to-owner-hand payments;
 - direct source-instance payments;
 - ordered resolution, dependencies, optional choices, simultaneity, and finite repetition;
 - LOOK-result manipulation and remainder sets;
@@ -57,7 +57,7 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - arbitrary behavior, card-specific code, or instructions exclusive to a particular card;
 - generic modification of attack procedures, arbitrary attack redirection, generic effect negation, unrestricted action prohibition, or unrestricted modification of game procedures.
 
-Deck construction restrictions and effects that modify deck construction rules are outside the FCL 1.3.0 gameplay program. Editorial legality data may be stored outside executable instructions.
+Deck construction restrictions and effects that modify deck construction rules are outside the FCL 1.4.0 gameplay program. Editorial legality data may be stored outside executable instructions.
 
 ### 2.3 Mandatory Semantic Principles
 
@@ -175,7 +175,7 @@ Minimal structural example:
 
 ```
 format = "FL_CARD_LANGUAGE"
-language_version = "1.3.0"
+language_version = "1.4.0"
 
 [card]
 number = "OP01-001"
@@ -407,7 +407,7 @@ code = "BLOCKED_CAPABILITY"
 scope = "ABILITY"
 ability_id = "A2"
 source_excerpt = "..."
-reason = "The text requires an operation not defined in the 1.3.0 profile."
+reason = "The text requires an operation not defined in the 1.4.0 profile."
 references = ["CR-8-1-3-4"]
 ```
 
@@ -1142,12 +1142,13 @@ If the payer accepts an optional payment, carry out the payment according to its
 | `DON_MINUS`                   | `kind`, `payer`, `selection`                                 | Select the indicated number of DON!! in the payer's Leader, Character, and Cost Areas and return them to the DON!! Deck, according to CR 8-3-1-6; either state is eligible. |
 | `REST_CARD`                   | `kind`, `payer`, and exactly one of `selection` or `subject` | Select and rest one eligible active card, or rest the explicitly referenced source instance.                                                                                |
 | `TRASH_HAND_CARD`             | `kind`, `payer`, `selection`                                 | Select one card from the payer's Hand and send it to the Trash.                                                                                                             |
+| `RETURN_CHARACTER_TO_OWNER_HAND` | `kind`, `payer`, `selection`                              | Select one of the payer's Characters and return it to its owner's Hand as payment.                                                                                          |
 | `ADD_LIFE_TO_HAND`            | `kind`, `payer`, `quantity`                                  | Move the indicated number of cards from the top of the payer's Life Area to that player's Hand as a payment.                                                                |
 | `PLACE_HAND_CARD_BOTTOM_DECK` | `kind`, `payer`, `selection`                                 | Select one card from the payer's Hand and place it at the bottom of that payer's Deck as a payment.                                                                         |
 
 The `optional` field may be used with any payment type when the card text makes that payment optional.
 
-For `REST_DON`, `DON_MINUS`, `REST_CARD` when using `selection`, `TRASH_HAND_CARD`, and `PLACE_HAND_CARD_BOTTOM_DECK`, `selection` is a payment-selection table, not an ID of a `SELECT` step.
+For `REST_DON`, `DON_MINUS`, `REST_CARD` when using `selection`, `TRASH_HAND_CARD`, `RETURN_CHARACTER_TO_OWNER_HAND`, and `PLACE_HAND_CARD_BOTTOM_DECK`, `selection` is a payment-selection table, not an ID of a `SELECT` step.
 
 Payment-selection fields:
 
@@ -1163,11 +1164,13 @@ For `REST_DON`, `areas` must point only to the payer's Cost Area, `object = "DON
 
 For `DON_MINUS`, `areas` must point to the three permitted areas of the payer.
 
-For `REST_CARD` when using `selection`, and `TRASH_HAND_CARD`, `quantity` must be FIXED 1.
+For `REST_CARD` when using `selection`, `TRASH_HAND_CARD`, and `RETURN_CHARACTER_TO_OWNER_HAND`, `quantity` must be FIXED 1.
 
 `REST_CARD.filter` must restrict `STATE = ACTIVE`.
 
 For `TRASH_HAND_CARD` and `PLACE_HAND_CARD_BOTTOM_DECK`, `areas` must point to the payer's Hand.
+
+For `RETURN_CHARACTER_TO_OWNER_HAND`, `areas` must point only to the payer's Character Area, `object` must be `CARD`, `quantity` must be FIXED 1, `chooser` must be the payer, `information` must be `PUBLIC_INFORMATION`, and `filter` must restrict `CATEGORY = CHARACTER`.
 
 `PLACE_HAND_CARD_BOTTOM_DECK` requires `object = "CARD"` and `quantity = FIXED 1`. Its chooser must be the payer, and its information must be `OWNER_PRIVATE_INFORMATION`.
 
@@ -1208,11 +1211,7 @@ If the payment is accepted and its quantity is `UP_TO`, the payer chooses a quan
 Example:
 
 ```
-{ kind = "ADD_LIFE_TO_HAND",
-  payer = { kind = "PLAYER", role = "YOU" },
-  quantity = { mode = "UP_TO", maximum = { literal = 1 } },
-  optional = true
-}
+{ kind = "ADD_LIFE_TO_HAND", payer = { kind = "PLAYER", role = "YOU" }, quantity = { mode = "UP_TO", maximum = { literal = 1 } }, optional = true }
 ```
 
 This structure represents an optional payment of up to one top Life card. It does not represent damage, a Trigger event, or a `MOVE_LIFE_CARD` resolution operation.
@@ -1235,17 +1234,7 @@ The chooser must be the payer. The information level must be `OWNER_PRIVATE_INFO
 Example:
 
 ```
-{ kind = "PLACE_HAND_CARD_BOTTOM_DECK",
-  payer = { kind = "PLAYER", role = "YOU" },
-  selection = {
-    object = "CARD",
-    areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }],
-    quantity = { mode = "FIXED", value = { literal = 1 } },
-    chooser = { kind = "PLAYER", role = "YOU" },
-    information = "OWNER_PRIVATE_INFORMATION"
-  },
-  optional = true
-}
+{ kind = "PLACE_HAND_CARD_BOTTOM_DECK", payer = { kind = "PLAYER", role = "YOU" }, selection = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }], quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "OWNER_PRIVATE_INFORMATION" }, optional = true }
 ```
 
 The selected card is moved from the payer's Hand to the bottom of that same player's Deck as part of payment processing.
@@ -1260,17 +1249,53 @@ Declining an optional payment prevents activation of the associated effect. Acce
 
 If the payer cannot select a legal card from their Hand, the payment cannot be made and the associated effect cannot be activated.
 
-### 17.3 Direct Source-Instance REST_CARD Payment
+### 17.3 Character-to-Owner-Hand Payment
+
+`RETURN_CHARACTER_TO_OWNER_HAND` represents a Character selected from the payer's Character Area and returned to that card's owner's Hand as an Activation Cost or other payment accepted by §17.
+
+Its fields are:
+
+- `kind = "RETURN_CHARACTER_TO_OWNER_HAND"`;
+- `payer`: PLAYER_REF;
+- `selection`: payment-selection table;
+- `optional`: optional boolean.
+
+The payment-selection table must identify exactly one `CARD` from the payer's `CHARACTER_AREA`.
+
+The selection must satisfy all of the following:
+
+- `areas` contains only the payer's `CHARACTER_AREA`;
+- `quantity` is `FIXED 1`;
+- `chooser` is the payer;
+- `information` is `PUBLIC_INFORMATION`;
+- `filter` is present and restricts `CATEGORY` to `CHARACTER`.
+
+Example:
+
+```
+{ kind = "RETURN_CHARACTER_TO_OWNER_HAND", payer = { kind = "PLAYER", role = "YOU" }, selection = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }], filter = { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } }, quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "PUBLIC_INFORMATION" }, optional = true }
+```
+
+The selected Character is moved from the payer's Character Area to the Hand belonging to that selected card's owner. The destination is resolved separately for the selected instance using `OWNER`; it is not automatically the payer's Hand.
+
+The payer is the player whose Character Area is searched and who chooses the Character. The owner of the selected Character is the player whose Hand receives it. These roles may identify different players.
+
+The payment is ordinary movement as part of payment processing. It is not K.O., Trash, or a resolution operation. It does not use `RETURN_CARD`, `MOVE_CARD`, or `POSITION_CARD` in `resolution`, and it does not create an `ON_KO` timing.
+
+The quantity is exactly one when the payment is accepted. Do not represent the wording "You may return 1 ..." as `UP_TO 1`: `optional = true` represents the choice to decline the entire payment, while `FIXED 1` represents the payment made when accepted. Declining the payment prevents activation of the associated effect.
+
+If the payer cannot select one eligible Character from their Character Area, the payment cannot be made and the associated effect cannot be activated. The general payment-impossibility rules in §17.5 apply.
+
+This payment does not imply that the selected Character can be played by the payer afterward. A later instruction to play a card from the payer's Hand selects only cards that are actually in that Hand at that later resolution point. If the selected Character's owner is the payer, the returned card is in the payer's Hand and may be eligible for that later instruction if it satisfies the instruction's conditions. If its owner is another player, it is placed in that other player's Hand.
+
+### 17.4 Direct Source-Instance REST_CARD Payment
 
 `REST_CARD` normally uses a payment-selection table. Version 1.3.0 additionally permits a direct `subject` reference when the text explicitly identifies the source instance as the payment object.
 
 The direct form is:
 
 ```
-{ kind = "REST_CARD",
-  payer = { kind = "PLAYER", role = "YOU" },
-  subject = { kind = "SOURCE" }
-}
+{ kind = "REST_CARD", payer = { kind = "PLAYER", role = "YOU" }, subject = { kind = "SOURCE" } }
 ```
 
 When `subject` is used:
@@ -1290,16 +1315,12 @@ The direct form is not a general mechanism for selecting arbitrary card instance
 Example:
 
 ```
-{ kind = "REST_CARD",
-  payer = { kind = "PLAYER", role = "YOU" },
-  subject = { kind = "SOURCE" },
-  optional = true
-}
+{ kind = "REST_CARD", payer = { kind = "PLAYER", role = "YOU" }, subject = { kind = "SOURCE" }, optional = true }
 ```
 
 If the source cannot be rested, the cost cannot be paid and the associated effect does not activate. The engine handles the normal payment impossibility procedure.
 
-### 17.4 General Payment Rules
+### 17.5 General Payment Rules
 
 DON!! may be attached only through the `GIVE_DON` operation; payments do not transfer DON!! given to another card.
 
@@ -1325,7 +1346,7 @@ An alternative cost is not a mode choice. Do not assume alternative/additional c
 
 A replacement of Activation Cost is declared as a Replacement Effect and follows §16.3.
 
-Other payment types remain `BLOCKED_CAPABILITY` until a versioned extension defines them.
+Payment types not defined in this section remain `BLOCKED_CAPABILITY` until a versioned extension defines them.
 
 ## 18. Resolution — `resolution` and `steps`
 
@@ -1535,10 +1556,11 @@ When an operation moves a selected card and the destination area uses `player = 
 - `MOVE_LIFE_CARD` does not cause damage or offer Trigger. Trigger occurs only during the official damage procedure.
 - `ADD_LIFE_TO_HAND` is a payment, not damage, not a `MOVE_LIFE_CARD` resolution operation, and does not offer Trigger.
 - `PLACE_HAND_CARD_BOTTOM_DECK` is a payment, not a resolution operation, and does not shuffle the Deck.
+- `RETURN_CHARACTER_TO_OWNER_HAND` is a payment, not a resolution operation; it selects from the payer's Character Area and sends the selected Character to its owner's Hand.
 - `REST_CARD.subject = SOURCE` rests the exact source instance; it must not be approximated with a selection of another card.
 - `PLAY_CARD` processes play legality, cost/waiver, destination, and entry timing; it is not `MOVE_CARD`.
 - DON!! attached to a card is different from DON!! in the Cost Area and DON!! in the DON!! Deck.
-- `MODIFY_POWER` does not alter base Power. The wording "set Power to 0" has its own semantics under CR 4-12 and is neither `SET_BASE_POWER` nor `MODIFY_POWER`; because FCL 1.3.0 has no specific instruction for this procedure, it is `BLOCKED_CAPABILITY`.
+- `MODIFY_POWER` does not alter base Power. The wording "set Power to 0" has its own semantics under CR 4-12 and is neither `SET_BASE_POWER` nor `MODIFY_POWER`; because FCL 1.4.0 has no specific instruction for this procedure, it is `BLOCKED_CAPABILITY`.
 - Power may become negative without moving the card. Negative effective Cost is treated as zero outside calculations; the negative value may participate in calculations according to the CR.
 - Generic effect negation, unrestricted granting of arbitrary abilities, generic prohibition of arbitrary actions, and arbitrary modification of game procedures are blocked in this version; they must not be approximated through Keyword removal or `MOVE_CARD`.
 - `BLOCKER` is not generic redirection; the engine executes the Keyword's procedure.
@@ -1716,7 +1738,7 @@ In `AUTO`/`ACTIVATE`, `duration` is required for every `continuous` effect.
 
 A `PERMANENT` effect does not declare `duration` inside `continuous`. Its validity is determined by the card's presence, the rules, and optional `valid_when`.
 
-`GRANT_ABILITY`, `NEGATE_EFFECT`, generic `PROHIBIT_ACTION`, and generic `MODIFY_PROCEDURE` are outside the executable 1.3.0 profile. If the text requires any of these unrestricted capabilities, use `BLOCKED_CAPABILITY`.
+`GRANT_ABILITY`, `NEGATE_EFFECT`, generic `PROHIBIT_ACTION`, and generic `MODIFY_PROCEDURE` are outside the executable 1.4.0 profile. If the text requires any of these unrestricted capabilities, use `BLOCKED_CAPABILITY`.
 
 The specific `GRANT_ATTACK_TARGET_PERMISSION` and `PREVENT_BATTLE_KO` constructs are not generic forms of those excluded capabilities. They can be used only within the exact semantics and fields defined in §§20.1 and 20.2.
 
@@ -1804,6 +1826,7 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - a `REST_CARD` payment contains exactly one of `selection` or `subject`;
 - `REST_CARD.subject`, when present, is exactly `SOURCE`;
 - a `PLACE_HAND_CARD_BOTTOM_DECK` payment contains the required payment-selection structure;
+- a `RETURN_CHARACTER_TO_OWNER_HAND` payment contains the required payment-selection structure from §17.3, including `CARD`, the payer's `CHARACTER_AREA`, `FIXED 1`, the payer as chooser, `PUBLIC_INFORMATION`, and the required Character-category filter;
 - a `REMAINDER` step contains only the fields defined in §15.3;
 - `REMAINDER.excluding` contains only compatible earlier `SELECT` step IDs;
 - `POSITION_CARD` references a compatible singular object or set-producing result;
@@ -1818,6 +1841,7 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - area identifies a valid player and name;
 - property/state is applicable to the object;
 - every `EVENT_ACTIVATED_BY` Condition refers to an `AFTER_EVENT_CARD_RESOLUTION` timing context;
+- `RETURN_CHARACTER_TO_OWNER_HAND` selects from the payer's Character Area and resolves the destination Hand using the owner of the selected instance;
 - every color-set comparison references two compatible card objects;
 - every `REMAINDER.look_step` points to an earlier `LOOK` step in the same effect;
 - every ID in `REMAINDER.excluding` points to an earlier `SELECT` step in the same effect;
@@ -1838,6 +1862,8 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - optional payment separated from quantity choice;
 - Life-to-hand payment uses the top Life card procedure and does not create damage or Trigger;
 - hand-to-bottom-of-Deck payment occurs before resolution and does not shuffle the Deck;
+- Character-to-owner-hand payment occurs before resolution, selects exactly one Character from the payer's Character Area, and returns that instance to its owner's Hand; it is not `RETURN_CARD` resolution;
+- optional Character-to-owner-hand payment uses `optional = true` for declining the whole payment and `FIXED 1` for the accepted payment, not `UP_TO 1`;
 - source-instance REST_CARD payment identifies and rests the exact SOURCE;
 - selection preserves object, area, filter, cardinality, chooser, and information;
 - LOOK results preserve the identity of the examined cards;
@@ -1919,7 +1945,7 @@ The translating LLM must block whenever it cannot establish, from the current te
 
 `BLOCKED_NORMATIVE` means that normative support or official clarification is missing.
 
-`BLOCKED_CAPABILITY` means that the semantics are known, but the 1.3.0 profile has no construct to represent them faithfully.
+`BLOCKED_CAPABILITY` means that the semantics are known, but the 1.4.0 profile has no construct to represent them faithfully.
 
 `INVALID_SOURCE` means that the text, errata, language/region, or source data are insufficient or inconsistent.
 
@@ -1929,6 +1955,7 @@ Do not use `BLOCKED_CAPABILITY` for:
 - identifying the Event activator, which is represented by `EVENT_ACTIVATED_BY`;
 - optional Life-to-hand payments, which are represented by `ADD_LIFE_TO_HAND`;
 - hand-to-bottom-of-Deck payments, which are represented by `PLACE_HAND_CARD_BOTTOM_DECK`;
+- Character-to-owner-hand payments, which are represented by `RETURN_CHARACTER_TO_OWNER_HAND`;
 - direct source-instance REST_CARD payments, which are represented by `REST_CARD.subject = SOURCE`;
 - LOOK-result remainder manipulation, which is represented by `REMAINDER`;
 - color comparisons between multicolor cards, which are represented by `COLOR_SET_COMPARE`;
@@ -1950,10 +1977,13 @@ The translator must never invent an enumeration, opcode, property, player, or ex
 - Version 1.1.0 added compatible capabilities to 1.0.0 without changing the meaning of existing 1.0.0 constructs.
 - Version 1.2.0 added compatible capabilities to 1.1.0 without changing the meaning of existing 1.1.0 or 1.0.0 constructs.
 - Version 1.3.0 adds compatible capabilities to 1.2.0 without changing the meaning of existing 1.2.0, 1.1.0, or 1.0.0 constructs.
+- Version 1.4.0 adds compatible capabilities to 1.3.0 without changing the meaning of existing 1.3.0, 1.2.0, 1.1.0, or 1.0.0 constructs.
 - Existing documents using only 1.0.0 constructs may remain at `language_version = "1.0.0"`.
 - Existing documents using 1.1.0 constructs may remain at `language_version = "1.1.0"`.
 - Existing documents using only 1.2.0 constructs may remain at `language_version = "1.2.0"`.
-- A document using any construct introduced in 1.3.0 must declare `language_version = "1.3.0"`.
+- Existing documents using only 1.3.0 constructs may remain at `language_version = "1.3.0"`.
+- A document using any construct introduced in 1.3.0 must declare `language_version = "1.3.0"` or a later compatible version that explicitly retains that construct.
+- A document using `RETURN_CHARACTER_TO_OWNER_HAND`, introduced in 1.4.0, must declare `language_version = "1.4.0"`.
 - A compiler may support multiple explicitly declared versions, but it must not silently reinterpret a document from one version as another.
 - Unknown fields are rejected, except for scalar keys in `[editorial.extra]`.
 - Incompatible changes to structure, enumeration, type, or meaning require a new major version.
@@ -2564,9 +2594,109 @@ This example is intentionally complete: both gameplay abilities appearing in `so
 
 
 
+### 26.16 Optional Character-to-Owner-Hand Payment — OP01-047 Trafalgar Law
+
+This example represents the current official text of OP01-047 after the February 17, 2023 erratum. It demonstrates the distinction between the optional payment before the colon and the subsequent `UP_TO 1` selection during resolution.
+
+```
+format = "FL_CARD_LANGUAGE"
+language_version = "1.4.0"
+
+[card]
+number = "OP01-047"
+name = "Trafalgar Law"
+category = "CHARACTER"
+colors = ["GREEN"]
+types = ["Heart Pirates", "Supernovas"]
+attributes = ["SLASH"]
+cost = 5
+power = 6000
+counter = 0
+
+[source]
+raw_text = "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] You may return 1 Character to your hand: Play up to 1 Character card with a cost of 3 or less from your hand.  This card has been officially errata'd."
+current_text = "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.) [On Play] You may return 1 of your Characters to the owner's hand: Play up to 1 Character card with a cost of 3 or less from your hand."
+language = "en"
+region = "EN_NA_EU_OC_LATAM_ME"
+
+[[source.references]]
+id = "ERRATA-OP01-047-2023-02-17"
+kind = "ERRATA"
+document = "OFFICIAL_ONE_PIECE_CARD_GAME_ERRATA_CARDS"
+section = "OP01-047 Trafalgar Law"
+date = "2023-02-17"
+url = "https://en.onepiece-cardgame.com/rules/errata_card/"
+
+[[source.references]]
+id = "CR-8-3-1-4"
+kind = "CR"
+document = "ONE_PIECE_CARD_GAME_COMPREHENSIVE_RULES"
+version = "1.2.1"
+section = "8-3-1-4"
+url = "https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf?20260828="
+
+[[source.references]]
+id = "OP01-047-FAQ"
+kind = "FAQ"
+document = "OFFICIAL_OP01_FAQ"
+section = "OP01-047"
+date = "2024-04-05"
+url = "https://en.onepiece-cardgame.com/pdf/qa_op01.pdf?20240405="
+
+[translation]
+status = "SUPPORTED"
+
+[[editorial.printings]]
+set_id = "OP-01"
+rarity = "SR"
+art_id = "OP01-047"
+thumbnail_role = "SAMPLE"
+thumbnail_url = "https://optcgapi.com/media/static/Card_Images/OP01-047.jpg"
+rights = "UNVERIFIED"
+
+[[editorial.printings]]
+set_id = "OP-01"
+rarity = "SR"
+art_id = "OP01-047_p1"
+thumbnail_role = "SAMPLE"
+thumbnail_url = "https://optcgapi.com/media/static/Card_Images/OP01-047_p1.jpg"
+rights = "UNVERIFIED"
+
+[[abilities]]
+id = "A1"
+source_text = "[Blocker] (After your opponent declares an attack, you may rest this card to make it the new target of the attack.)"
+status = "SUPPORTED"
+keyword_effects = ["BLOCKER"]
+
+[[abilities]]
+id = "A2"
+source_text = "[On Play] You may return 1 of your Characters to the owner's hand: Play up to 1 Character card with a cost of 3 or less from your hand."
+status = "SUPPORTED"
+source_refs = ["ERRATA-OP01-047-2023-02-17", "CR-8-3-1-4", "OP01-047-FAQ"]
+
+[[abilities.effects]]
+id = "E1"
+category = "AUTO"
+timing = "ON_PLAY"
+effect_form = "ONE_SHOT"
+activation_costs = [
+  { kind = "RETURN_CHARACTER_TO_OWNER_HAND", payer = { kind = "PLAYER", role = "YOU" }, selection = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }], filter = { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } }, quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "PUBLIC_INFORMATION" }, optional = true }
+]
+resolution = [
+  { id = "S1", kind = "SELECT", object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }], filter = { all = [{ test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } }, { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "COST", operator = "LTE", value = { literal = 3 } }] }, quantity = { mode = "UP_TO", maximum = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "OWNER_PRIVATE_INFORMATION" },
+  { id = "S2", kind = "OPERATION", operation = "PLAY_CARD", selection = "S1", source_area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }, player = { kind = "PLAYER", role = "YOU" } }
+]
+```
+
+The erratum changes both the payment target and the resolution quantity. The payment selects one Character in the payer's Character Area but sends it to that card's owner's Hand; it does not assume that the payer is the card's owner. The payment is optional as a whole, while the accepted payment is exactly one Character.
+
+The `UP_TO 1` instruction is a separate choice during resolution. It permits the payer to play zero or one eligible Character from their Hand. Because selection occurs during resolution after payment, a returned Character is eligible for this instruction if it is now in the payer's Hand and meets the cost/category restrictions. The OP01-047 FAQ confirms that, when the returned Character is in the player's Hand, it may be played by the same effect.
+
+The phrase "This card has been officially errata'd." is not gameplay text and is therefore preserved only in `raw_text`, not in `current_text`.
+
 ## 27. Conformance
 
-A program conforms to FCL 1.3.0 only when:
+A program conforms to FCL 1.4.0 only when:
 
 1. it is valid TOML 1.0.0;
 2. it uses `format = "FL_CARD_LANGUAGE"` and declares an explicitly supported `language_version`;
@@ -2575,17 +2705,20 @@ A program conforms to FCL 1.3.0 only when:
 5. it contains no blocked gameplay abilities;
 6. it contains no unknown fields outside `[editorial.extra]`;
 7. every gameplay ability and instruction in `source.current_text` is accounted for and fully represented;
-8. any new 1.3.0 continuous-effect constructs obey the restrictions in §20.
+8. any 1.3.0 continuous-effect constructs obey the restrictions in §20;
+9. any `RETURN_CHARACTER_TO_OWNER_HAND` payment obeys §17.3.
 
 `SUPPORTED` is a translation conclusion, not proof that the VM implements every game rule.
 
 Program conformance, compiler coverage, and engine coverage are three distinct checks.
 
-A 1.0.0, 1.1.0, or 1.2.0 document remains at its declared version unless it uses a construct introduced in a later version. A program must not silently receive 1.3.0 semantics merely because it is processed by a newer compiler.
+A 1.0.0, 1.1.0, 1.2.0, or 1.3.0 document remains at its declared version unless it uses a construct introduced in a later version. A program must not silently receive 1.3.0 or 1.4.0 semantics merely because it is processed by a newer compiler.
 
-## 28. Version 1.3.0 Freeze
+## 28. Version 1.4.0 Freeze
 
-FCL 1.3.0 freezes:
+FCL 1.4.0 freezes the complete FCL 1.3.0 profile and adds the Character-to-owner-hand payment defined in §17.3.
+
+The frozen profile includes:
 
 - TOML 1.0.0 as the textual format;
 - one file per logical card identity;
@@ -2596,6 +2729,7 @@ FCL 1.3.0 freezes:
 - the `EVENT_ACTIVATED_BY` contextual condition;
 - `ADD_LIFE_TO_HAND` payment and explicit optional-payment semantics;
 - `PLACE_HAND_CARD_BOTTOM_DECK` payment;
+- `RETURN_CHARACTER_TO_OWNER_HAND` payment, including payer-area selection, owner-based destination, and optional-payment semantics;
 - direct `REST_CARD.subject = SOURCE` payment;
 - `REMAINDER` for the remainder of a LOOK result;
 - `THEN` clause-boundary representation;
@@ -2611,15 +2745,17 @@ FCL 1.3.0 freezes:
 - battle-context evaluation of `ATTACKER` within `PREVENT_BATTLE_KO.attacker_condition`;
 - strict validation and blocking of unsupported constructs.
 
+Version 1.3.0 remains frozen with its original semantics. The new payment type is available only to documents declaring `language_version = "1.4.0"`.
+
 This version is frozen and ready for real card translation testing.
 
-It does not declare that every card in the game can be translated or that the Rules Engine is ready.
+It does not declare that every published card can be translated or that the Rules Engine is ready.
 
 Cases outside the profile remain blocked; they do not silently change the frozen version.
 
 To change semantics or structure, open an extension proposal, document the card/text/rule requiring the capability, demonstrate why existing constructs are insufficient, define its interaction with the current profile, and publish a new version.
 
-Do not edit the meaning of FCL 1.3.0 during card translation.
+Do not edit the meaning of FCL 1.4.0 during card translation.
 
 ## 29. Engine Boundaries and Additional Normative Semantics
 
@@ -2641,7 +2777,7 @@ Roles: `YOU`, `OPPONENT`, `TURN_PLAYER`, `NON_TURN_PLAYER`, `CONTEXT_PLAYER`, `O
 
 `YOU` is never a universal substitute for owner, controller, Turn Player, or activator.
 
-`OWNER`/`CONTROLLER` are relative to the contextual object. For operations that move a referenced card, `OWNER` resolves to the owner of that card.
+`OWNER`/`CONTROLLER` are relative to the contextual object. For operations and payment types that move a referenced card to its owner's Hand, `OWNER` resolves to the owner of that card instance.
 
 `TEXT_DESIGNATED_OBJECT.designation` reproduces a literal expression from `source_text` and must identify a single instance.
 
@@ -2775,7 +2911,7 @@ Continuous effects are applied/stabilized by the engine in Turn Player, Non-Turn
 
 Prohibiting an action, negating/invalidating an effect, and an operation being impossible are different phenomena.
 
-FCL 1.3.0 does not provide generic instructions for arbitrary action prohibitions, effect negation, or unrestricted modification of game procedures. When the text requires those generic behaviors, block translation.
+FCL 1.4.0 does not provide generic instructions for arbitrary action prohibitions, effect negation, or unrestricted modification of game procedures. When the text requires those generic behaviors, block translation.
 
 The VM must not simulate them through Keyword removal or movement operations.
 
@@ -2847,6 +2983,14 @@ Relevant rules include:
 - CR 8-1-3-4 — Replacement Effects;
 - CR 8-3-1-4 — optional Activation Costs;
 - CR 8-3-1-7 — Activation Cost replacement.
+
+**Official Card Errata**
+
+`https://en.onepiece-cardgame.com/rules/errata_card/`
+
+Relevant entry:
+
+- February 17, 2023 — OP01-047 Trafalgar Law: changes the On Play payment to "You may return 1 of your Characters to the owner's hand" and changes the resolution instruction to "Play up to 1 Character card with a cost of 3 or less from your hand." The official "After" wording takes precedence over the original printed wording for all game formats.
 
 **Official OP01 FAQ**
 
