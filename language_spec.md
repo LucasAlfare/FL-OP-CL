@@ -1,10 +1,13 @@
-# FL Card Language (FCL) — Specification 1.1.0
+# FL Card Language (FCL) — Specification 1.2.0
 
-**Single Normative Document:** `FL_CARD_LANGUAGE_SPEC_v1.1.0.md`  
+**Single Normative Document:** `FL_CARD_LANGUAGE_SPEC_v1.2.0.md`  
 **Textual Format:** TOML 1.0.0  
-**Specification and Language Version:** 1.1.0  
+**Specification and Language Version:** 1.2.0  
+**Previous Version:** 1.1.0  
 **Freeze Date:** November 9, 2026  
 **Status:** `FROZEN — READY FOR CARD-TRANSLATION TESTING`
+
+---
 
 ## 1. Purpose and Authority
 
@@ -12,11 +15,11 @@ The FL Card Language (FCL) is a declarative language for describing One Piece Ca
 
 The card declares its specific behavior; the official rules define the procedures and consequences; the engine executes those procedures. FCL is not a general-purpose language. It does not contain Kotlin code, user-defined functions, callbacks, mutable variables, unrestricted loops, recursion, or arbitrary access to game state.
 
-Version 1.1.0 defines, in a single document, the canonical TOML format, the closed semantic profile, vocabularies, Replacement Effect structure, validation rules, and blocking policy. This document supersedes any previous specification, semantic contract, or addendum for FCL 1.1.0. No external document needs to be combined with it.
+Version 1.2.0 defines, in a single document, the canonical TOML format, the closed semantic profile, vocabularies, Replacement Effect structure, payment structures, LOOK-result manipulation, validation rules, and blocking policy. This document supersedes any previous specification, semantic contract, or addendum for FCL 1.2.0. No external document needs to be combined with it.
 
 The external lexical and syntactic grammar is TOML 1.0.0. FCL adds a closed profile of tables, fields, types, enumerations, and semantic invariants. `language_version` identifies the structure and meaning of the constructs used by a card program. There is no separate semantic-profile field.
 
-Version 1.1.0 is an additive extension of 1.0.0. Existing 1.0.0 constructs retain their original meanings. Existing 1.0.0 documents do not need to be rewritten merely because this specification has been updated. New constructs introduced in 1.1.0 require `language_version = "1.1.0"`.
+Version 1.2.0 is an additive extension of 1.1.0. Existing 1.1.0 and 1.0.0 constructs retain their original meanings. Existing documents do not need to be rewritten merely because this specification has been updated. New constructs introduced in 1.2.0 require `language_version = "1.2.0"`.
 
 `FROZEN` means that the contract for this version is closed and ready for card translation and testing to begin. It does not mean that every published card is supported, that the compiler/VM already exists, or that every game interaction has been implemented. Any behavior outside this profile must be blocked rather than approximated. Structural or semantic changes require a new version.
 
@@ -34,9 +37,13 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - event-resolution timing and contextual Event activation information;
 - color-set comparisons, including multicolor semantics;
 - selections, quantities, mode choices, and information;
-- activation costs and supported payments, including Life-to-hand payments;
+- activation costs and supported payments;
 - optional activation-cost payments;
+- Life-to-hand payments;
+- hand-to-bottom-of-Deck payments;
+- direct source-instance payments;
 - ordered resolution, dependencies, optional choices, simultaneity, and finite repetition;
+- LOOK-result manipulation and remainder sets;
 - game operations enumerated in this profile;
 - continuous effects, scope, validity, and duration;
 - source references, traceability, and translation blocking.
@@ -49,7 +56,7 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - operations, conditions, timings, durations, or properties not enumerated in this document;
 - arbitrary behavior, card-specific code, or instructions exclusive to a particular card.
 
-Deck construction restrictions and effects that modify deck construction rules are outside the FCL 1.1.0 gameplay program. Editorial legality data may be stored outside executable instructions.
+Deck construction restrictions and effects that modify deck construction rules are outside the FCL 1.2.0 gameplay program. Editorial legality data may be stored outside executable instructions.
 
 ### 2.3 Mandatory Semantic Principles
 
@@ -61,6 +68,8 @@ Deck construction restrictions and effects that modify deck construction rules a
 6. The card does not reimplement the engine. Priority, phases, battle, damage processing, K.O., Trigger, permanent-effect stabilization, information rules, competing replacements, and loops are engine procedures.
 7. A card's logical identity does not guarantee that every physical printing has identical gameplay characteristics. When official sources establish a printing-specific difference, represent it through `card.printing_overrides`; never merge differing gameplay characteristics into editorial metadata.
 8. A multicolor card is treated as possessing every color it has. Color comparisons must operate on complete color sets according to the Comprehensive Rules, not on a single arbitrarily selected color.
+9. A LOOK result is a temporary set of identified card instances, not a permanent selection and not an independently movable area. Subsequent instructions must preserve the identity of the looked cards and account for cards already selected or moved.
+10. A payment that references `SOURCE` identifies the actual card instance containing the activated ability. It must not be substituted with an arbitrary card satisfying the same category or state.
 
 A structurally valid TOML document may still be semantically incorrect. `SUPPORTED` requires structural validation and normative justification, not merely successful parsing.
 
@@ -135,7 +144,7 @@ Minimal structural example:
 
 ```toml
 format = "FL_CARD_LANGUAGE"
-language_version = "1.1.0"
+language_version = "1.2.0"
 
 [card]
 number = "OP01-001"
@@ -169,7 +178,7 @@ Permitted fields:
 | Field | Type | Rule |
 |---|---|---|
 | `number` | string | Required; official card number |
-| `name` | string | Required |
+| `name` | string | Required; official card name |
 | `category` | enum | Required: `LEADER`, `CHARACTER`, `EVENT`, `STAGE`, `DON` |
 | `colors` | array of enums | Required; one or more printed colors |
 | `types` | array of strings | Printed types; empty only when officially typeless |
@@ -189,6 +198,18 @@ Permitted fields:
 `attributes`: `SLASH`, `STRIKE`, `RANGED`, `SPECIAL`, `WISDOM`, `QUESTION_MARK`.
 
 `types` are literal printed data, not closed language enumerations. Preserve the official spelling and content used by the selected source.
+
+Each distinct printed type is a separate string element in `types`.
+
+For example:
+
+```toml
+types = ["Fish-Man", "Straw Hat Crew"]
+```
+
+A source API may concatenate multiple printed types into a single string, such as `"Fish-Man Straw Hat Crew"`. Such concatenation must not be copied as one type when the official card data establishes multiple types.
+
+Do not split a concatenated string by whitespace alone. Type names may themselves contain spaces. Determine the actual type boundaries from an authoritative card source. When boundaries cannot be established reliably, do not invent them; investigate or classify the affected source information appropriately.
 
 ### 6.2 Applicability
 
@@ -318,6 +339,10 @@ References must identify the actual source used. Do not fabricate URLs, dates, v
 
 An `ERRATA` reference must identify the correction actually applied to `current_text`. If the exact official correction cannot be located or its scope cannot be established, do not invent corrected wording.
 
+A reference is required when a translation relies on an external normative determination that is not sufficiently established by the card text and this specification alone. This includes interpretations taken from an applicable FAQ, erratum, or specific Comprehensive Rules provision.
+
+References are not required merely to populate a card with ordinary printed characteristics when the supplied authoritative card data is sufficient. Do not fabricate references simply to make every file contain a non-empty `source.references` list.
+
 ## 8. Translation Result — `[translation]`
 
 `[translation]` contains `status` (required) and `notes` (optional, with no executable semantics). `status` accepts `SUPPORTED`, `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE`, or `NON_GAME_TEXT`.
@@ -343,7 +368,7 @@ code = "BLOCKED_CAPABILITY"
 scope = "ABILITY"
 ability_id = "A2"
 source_excerpt = "..."
-reason = "The text requires an operation not defined in the 1.1.0 profile."
+reason = "The text requires an operation not defined in the 1.2.0 profile."
 references = ["CR-8-1-3-4"]
 ```
 
@@ -357,6 +382,10 @@ references = ["CR-8-1-3-4"]
 - `SUPPORTED` and `NON_GAME_TEXT` cannot have blockers. `BLOCKED_*` and `INVALID_SOURCE` require at least one blocker.
 - If at least one gameplay ability exists, `translation.status` is the most severe status among gameplay abilities and `CARD`-scope blockers: `INVALID_SOURCE` > `BLOCKED_NORMATIVE` > `BLOCKED_CAPABILITY` > `SUPPORTED`. `NON_GAME_TEXT` abilities do not participate in this comparison. Use `translation.status = "NON_GAME_TEXT"` only when the card has no gameplay ability.
 - Every blocker must correspond to an existing ability/effect when its scope is `ABILITY`/`EFFECT`; statuses and blockers must agree.
+- An `ABILITY`-scope blocker must reference an existing `ability_id`.
+- An `EFFECT`-scope blocker must reference an existing `ability_id` and an existing `effect_id` belonging to that ability.
+- A blocker with `scope = "CARD"` must not contain `ability_id` or `effect_id`.
+- Every blocked ability must have at least one corresponding blocker. A card cannot be marked blocked merely by setting an ability's status; blocker evidence is mandatory.
 - `notes` does not replace `reason` and does not alter execution.
 
 ## 9. Editorial Metadata — `[editorial]`
@@ -662,7 +691,7 @@ Card states in areas with state: `ACTIVE`, `RESTED`. DON!! attached to a card ha
 
 Stack positions: `TOP`, `BOTTOM`, `NORMAL` when the official procedure permits normal positioning.
 
-References identify instances, roles, or results defined by the engine or by an earlier selection. Use exactly one of the following forms:
+References identify instances, roles, or results defined by the engine or by an earlier selection/result. Use exactly one of the following forms:
 
 | `kind` | Additional fields | Meaning |
 |---|---|---|
@@ -670,8 +699,8 @@ References identify instances, roles, or results defined by the engine or by an 
 | `EVENT_OBJECT` | none | Object involved in the contextual event |
 | `PLAYER` | `role` | Player role |
 | `AREA` | `player`, `name` | Area belonging to a player |
-| `SELECTED_OBJECT` | `selection` | Singular object obtained from an earlier selection |
-| `SELECTED_SET` | `selection` | Set obtained from an earlier selection |
+| `SELECTED_OBJECT` | `selection` | Singular object obtained from an earlier `SELECT` step |
+| `SELECTED_SET` | `selection` | Set obtained from an earlier `SELECT` or `REMAINDER` step |
 | `TEXT_DESIGNATED_OBJECT` | `designation` | Singular object designated by the text/rules |
 | `ATTACKER` | none | Attacker in the battle context |
 | `ATTACK_TARGET` | none | Attack target in the battle context |
@@ -681,7 +710,7 @@ References identify instances, roles, or results defined by the engine or by an 
 
 A `PLAYER` reference uses `{ kind = "PLAYER", role = ROLE }`; `AREA` uses `{ kind = "AREA", player = PLAYER_REF, name = AREA_NAME }`. `AREA_NAME` accepts only the areas listed above.
 
-`SELECTED_OBJECT`/`SELECTED_SET` use `selection` equal to the ID of a previous `SELECT` step. The other `kind` values accept no additional fields.
+`SELECTED_OBJECT` uses `selection` equal to the ID of a previous singular `SELECT` result. `SELECTED_SET` uses `selection` equal to the ID of a previous set-producing `SELECT` or `REMAINDER` step. The referenced step must appear earlier in the same effect or Replacement Effect procedure.
 
 Player roles:
 
@@ -714,7 +743,7 @@ Do not replace `OWNER` with `YOU` merely because the ability is controlled by th
 
 `NONE` is not an area. A card temporarily without an area, such as during the Trigger cycle, is handled by the engine procedure, not by an artificial `NONE` area.
 
-Selection IDs are local to an effect. A selection reference may point only to an earlier selection within the same resolution. There is no reference to a global variable, an implicit "last card", or an arbitrary instance ID.
+Selection/result IDs are local to an effect. A reference may point only to an earlier compatible result within the same resolution. There is no reference to a global variable, an implicit "last card", or an arbitrary instance ID.
 
 ## 15. Quantities, Selections, and Choices
 
@@ -768,11 +797,60 @@ Selection does not move, reveal, K.O., discard, or otherwise alter the object. S
 
 A selection with singular cardinality produces `SELECTED_OBJECT`; a plural or `UP_TO` selection produces `SELECTED_SET`. IDs are local to the effect and do not survive resolution.
 
-`order_chooser` is a PLAYER reference and appears only when the CR/text grants a player the choice. When multiple cards are placed simultaneously into an area, preserve any ordering choice required by the CR. Never rewrite simultaneous movement as an arbitrary sequence.
+`order_chooser` is a PLAYER reference and appears only when the CR/text grants a player the choice of order. When multiple cards are placed simultaneously into an area, preserve any ordering choice required by the CR. Never rewrite simultaneous movement as an arbitrary sequence.
+
+### 15.3 LOOK Remainder
+
+A `REMAINDER` step identifies the cards from an earlier `LOOK` result that remain after specified earlier selections have been excluded.
+
+It does not perform a new selection, reveal cards, move cards, or change their order.
+
+The result is a temporary set and exists only within the same resolution in which the referenced `LOOK` occurred.
+
+A `REMAINDER` step has the following fields:
+
+| Field | Type | Requirement |
+|---|---|---|
+| `id` | string | Required; unique within the effect |
+| `kind` | enum | Required: `REMAINDER` |
+| `look_step` | string | Required; ID of an earlier `LOOK` step |
+| `excluding` | array of strings | Optional; IDs of earlier `SELECT` steps whose selected objects are excluded from the remainder |
+
+Example:
+
+```toml
+{ id = "R1",
+  kind = "REMAINDER",
+  look_step = "S1",
+  excluding = ["S2"]
+}
+```
+
+The remainder contains every card in the referenced LOOK result that:
+
+1. was part of the original LOOK result;
+2. remains in the area examined by that LOOK at the time the `REMAINDER` step is evaluated;
+3. is not part of any selection identified in `excluding`.
+
+`excluding` may contain only IDs of earlier `SELECT` steps whose `information_step` points to the same `look_step` and whose candidates are restricted to that LOOK result.
+
+If `excluding` is omitted, no previous selection is explicitly excluded.
+
+A card moved out of the examined area by an earlier step is not part of the remainder, even when its selection ID is not listed in `excluding`.
+
+A selected card listed in `excluding` is excluded from the remainder even if it remains in the original area.
+
+The order of cards in the remainder is not an instruction to the engine to move them sequentially. Any subsequent movement or positioning must preserve the ordering choice and simultaneous-processing semantics required by the card text and CR.
+
+A `REMAINDER` result can be referenced by `SELECTED_SET` and by operation parameters that accept a set-producing `selection`.
+
+`REMAINDER` does not grant permission to inspect or select cards outside the original LOOK result.
+
+If an instruction requires identifying the remainder of a set produced by a mechanism other than LOOK, this construct does not apply. Block the translation unless another explicitly defined construct covers that mechanism.
 
 ## 16. Replacement Effects — Mandatory Structure
 
-This section incorporates the complete normative content relevant to Replacement Effects. No separate replacement addendum is required. In case of conflict with older documents, this section prevails for FCL 1.1.0.
+This section incorporates the complete normative content relevant to Replacement Effects. No separate replacement addendum is required.
 
 Every declaration with `category = "REPLACEMENT"` contains `[abilities.effects.replacement]`.
 
@@ -947,13 +1025,14 @@ If the payer accepts an optional payment, carry out the payment according to its
 |---|---|---|
 | `REST_DON` | `kind`, `payer`, `selection` | Select and rest the indicated number of active DON!! in the payer's Cost Area. |
 | `DON_MINUS` | `kind`, `payer`, `selection` | Select the indicated number of DON!! in the payer's Leader, Character, and Cost Areas and return them to the DON!! Deck, according to CR 8-3-1-6; either state is eligible. |
-| `REST_CARD` | `kind`, `payer`, `selection` | Select and rest one eligible active card in the payer's context. |
+| `REST_CARD` | `kind`, `payer`, and exactly one of `selection` or `subject` | Select and rest one eligible active card, or rest the explicitly referenced source instance. |
 | `TRASH_HAND_CARD` | `kind`, `payer`, `selection` | Select one card from the payer's Hand and send it to the Trash. |
 | `ADD_LIFE_TO_HAND` | `kind`, `payer`, `quantity` | Move the indicated number of cards from the top of the payer's Life Area to that player's Hand as a payment. |
+| `PLACE_HAND_CARD_BOTTOM_DECK` | `kind`, `payer`, `selection` | Select one card from the payer's Hand and place it at the bottom of that payer's Deck as a payment. |
 
 The `optional` field may be used with any payment type when the card text makes that payment optional.
 
-For `REST_DON`, `DON_MINUS`, `REST_CARD`, and `TRASH_HAND_CARD`, `selection` is a payment-selection table, not an ID of a `SELECT` step.
+For `REST_DON`, `DON_MINUS`, `REST_CARD` when using `selection`, `TRASH_HAND_CARD`, and `PLACE_HAND_CARD_BOTTOM_DECK`, `selection` is a payment-selection table, not an ID of a `SELECT` step.
 
 Payment-selection fields:
 
@@ -969,11 +1048,13 @@ For `REST_DON`, `areas` must point only to the payer's Cost Area, `object = "DON
 
 For `DON_MINUS`, `areas` must point to the three permitted areas of the payer.
 
-For `REST_CARD` and `TRASH_HAND_CARD`, `quantity` must be FIXED 1.
+For `REST_CARD` when using `selection`, and `TRASH_HAND_CARD`, `quantity` must be FIXED 1.
 
 `REST_CARD.filter` must restrict `STATE = ACTIVE`.
 
-For `TRASH_HAND_CARD`, `areas` must point to the payer's Hand.
+For `TRASH_HAND_CARD` and `PLACE_HAND_CARD_BOTTOM_DECK`, `areas` must point to the payer's Hand.
+
+`PLACE_HAND_CARD_BOTTOM_DECK` requires `object = "CARD"` and `quantity = FIXED 1`. Its chooser must be the payer, and its information must be `OWNER_PRIVATE_INFORMATION`.
 
 The `chooser` is the player who makes the selection. If text/rules do not determine that player, block.
 
@@ -1021,7 +1102,89 @@ Example:
 
 This structure represents an optional payment of up to one top Life card. It does not represent damage, a Trigger event, or a `MOVE_LIFE_CARD` resolution operation.
 
-### 17.2 General Payment Rules
+### 17.2 Hand-to-Bottom-of-Deck Payment
+
+`PLACE_HAND_CARD_BOTTOM_DECK` represents a payment that selects one card from the payer's Hand and places that card at the bottom of the payer's Deck.
+
+Its fields are:
+
+- `kind = "PLACE_HAND_CARD_BOTTOM_DECK"`;
+- `payer`: PLAYER_REF;
+- `selection`: payment-selection table;
+- `optional`: optional boolean.
+
+The payment-selection table must identify exactly one `CARD` from the payer's `HAND`.
+
+The chooser must be the payer. The information level must be `OWNER_PRIVATE_INFORMATION`.
+
+Example:
+
+```toml
+{ kind = "PLACE_HAND_CARD_BOTTOM_DECK",
+  payer = { kind = "PLAYER", role = "YOU" },
+  selection = {
+    object = "CARD",
+    areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }],
+    quantity = { mode = "FIXED", value = { literal = 1 } },
+    chooser = { kind = "PLAYER", role = "YOU" },
+    information = "OWNER_PRIVATE_INFORMATION"
+  },
+  optional = true
+}
+```
+
+The selected card is moved from the payer's Hand to the bottom of that same player's Deck as part of payment processing.
+
+This payment is not a `POSITION_CARD` resolution operation, a `MOVE_CARD` resolution operation, or a post-payment effect. It occurs before the associated effect resolves.
+
+The payment does not reveal the selected card to the opponent unless another applicable rule or effect requires it.
+
+The payment does not shuffle the Deck.
+
+Declining an optional payment prevents activation of the associated effect. Accepting the payment and selecting the card are distinct from a resolution choice.
+
+If the payer cannot select a legal card from their Hand, the payment cannot be made and the associated effect cannot be activated.
+
+### 17.3 Direct Source-Instance REST_CARD Payment
+
+`REST_CARD` normally uses a payment-selection table. Version 1.2.0 additionally permits a direct `subject` reference when the text explicitly identifies the source instance as the payment object.
+
+The direct form is:
+
+```toml
+{ kind = "REST_CARD",
+  payer = { kind = "PLAYER", role = "YOU" },
+  subject = { kind = "SOURCE" }
+}
+```
+
+When `subject` is used:
+
+- `selection` is forbidden;
+- `subject` must be `{ kind = "SOURCE" }`;
+- the source must be a card that can legally be rested;
+- the source must be controlled by the payer;
+- the source must be active when the payment is processed;
+- the payment rests that exact source instance;
+- the engine must not substitute another card, even if another card would satisfy the same category, area, and state restrictions.
+
+The direct form does not use `object`, `areas`, `quantity`, `chooser`, `information`, or `filter`.
+
+The direct form is not a general mechanism for selecting arbitrary card instances. It exists only for text/rules that identify the source card itself as the payment object.
+
+Example:
+
+```toml
+{ kind = "REST_CARD",
+  payer = { kind = "PLAYER", role = "YOU" },
+  subject = { kind = "SOURCE" },
+  optional = true
+}
+```
+
+If the source cannot be rested, the cost cannot be paid and the associated effect does not activate. The engine handles the normal payment impossibility procedure.
+
+### 17.4 General Payment Rules
 
 DON!! may be attached only through the `GIVE_DON` operation; payments do not transfer DON!! given to another card.
 
@@ -1056,6 +1219,7 @@ Other payment types remain `BLOCKED_CAPABILITY` until a versioned extension defi
 | `kind` | Required fields in addition to `id`/`kind` | Optional fields |
 |---|---|---|
 | `SELECT` | `object`, `areas`, `quantity`, `chooser`, `information` | `filter`, `information_step`, `order_chooser` |
+| `REMAINDER` | `look_step` | `excluding` |
 | `OPERATION` | `operation` and required fields from §19.1 | only optional fields from §19.1 |
 | `IF` | `condition`, `steps` | — |
 | `THEN` | `steps` | — |
@@ -1066,6 +1230,8 @@ Other payment types remain `BLOCKED_CAPABILITY` until a versioned extension defi
 | `REPEAT` | `quantity`, `steps` | — |
 
 `SELECT` follows §15.2.
+
+`REMAINDER` follows §15.3.
 
 `OPERATION` uses only references valid at execution time.
 
@@ -1098,6 +1264,12 @@ Impossible actions and consequences for subsequent steps follow the text and CR;
 Contains `steps`.
 
 It marks the corresponding subsequent textual clause; it does not create a universal dependency on the success of the immediately preceding step.
+
+When card text explicitly introduces a subsequent clause with "Then", the translator must preserve that clause boundary using `THEN`, unless the official rules or another more specific FCL construct requires a different representation.
+
+`THEN` is not a substitute for `IF`, `IF_YOU_DO`, `OPTIONAL`, or `SIMULTANEOUS`.
+
+The presence of `THEN` does not automatically mean that the subsequent clause depends on the success of the previous clause.
 
 ### 18.5 `IF_YOU_DO`
 
@@ -1167,13 +1339,13 @@ The engine handles generated events, Trigger, `rule processing`, and general loo
 | `GRANT_KEYWORD_EFFECT` | Grant a recognized Keyword Effect/Keyword, with validity and duration. |
 | `DEAL_LEADER_DAMAGE` | Invoke official Leader damage procedure caused by an effect, including Life, Trigger, replacements, and defeat. |
 | `MOVE_LIFE_CARD` | Ordinary movement involving Life; it is not damage and does not offer Trigger by itself. |
-| `POSITION_CARD` | Position a card at the top/bottom of an authorized stack. |
+| `POSITION_CARD` | Position a card or selected set at the top/bottom of an authorized stack. |
 | `RETURN_CARD` | Return a card to Hand, Deck, or Trash, preserving destination and owner/player. |
 | `END_GAME` | Grant victory/defeat only when explicitly authorized by the text/rules. |
 
 ### 19.1 Parameters by Operation
 
-`subject` is a singular reference from §14; `selection` is the ID of a previous `SELECT` step.
+`subject` is a singular reference from §14; `selection` is the ID of a previous compatible `SELECT` or `REMAINDER` step.
 
 When the matrix says `subject` or `selection`, exactly one must appear.
 
@@ -1218,6 +1390,12 @@ Area references are AREA_REF; `player` is PLAYER_REF; quantities follow §15.1; 
 
 `look_step` may point only to a previous `LOOK` in the same resolution.
 
+`POSITION_CARD` with a `selection` that references a `REMAINDER` step positions every card in the remainder set. The engine must process the set as a single group for the purpose of the destination positioning instruction.
+
+When the text grants a player the choice of order, `order_chooser` identifies that player. The engine must preserve the chosen final order at the destination. It must not interpret the array order in the TOML as the chosen order.
+
+If a `POSITION_CARD` operation positions a set of multiple cards at the bottom of a Deck and the text grants a choice of order, `order_chooser` is required.
+
 `face` accepts `FACE_UP` or `FACE_DOWN`; `state`/`source_state`/`arrival_state` accept `ACTIVE` or `RESTED`; `position` accepts `TOP`, `BOTTOM`, or `NORMAL` when permitted by the procedure. `order_chooser` is a PLAYER_REF.
 
 `GIVE_DON.source_state = "ACTIVE"` is the normal case; `source_state = "RESTED"` is supported only when official text/FAQ authorizes that selection. EB05-057 confirms only the specific scenario addressed.
@@ -1239,18 +1417,24 @@ When an operation moves a selected card and the destination area uses `player = 
 - K.O. generates the K.O. procedure/event; ordinary Trash does not generate `[On K.O.]`.
 - `MOVE_LIFE_CARD` does not cause damage or offer Trigger. Trigger occurs only during the official damage procedure.
 - `ADD_LIFE_TO_HAND` is a payment, not damage, not a `MOVE_LIFE_CARD` resolution operation, and does not offer Trigger.
+- `PLACE_HAND_CARD_BOTTOM_DECK` is a payment, not a resolution operation, and does not shuffle the Deck.
+- `REST_CARD.subject = SOURCE` rests the exact source instance; it must not be approximated with a selection of another card.
 - `PLAY_CARD` processes play legality, cost/waiver, destination, and entry timing; it is not `MOVE_CARD`.
 - DON!! attached to a card is different from DON!! in the Cost Area and DON!! in the DON!! Deck.
-- `MODIFY_POWER` does not alter base Power. The wording "set Power to 0" has its own semantics under CR 4-12 and is neither `SET_BASE_POWER` nor `MODIFY_POWER`; because FCL 1.1.0 has no specific instruction for this procedure, it is `BLOCKED_CAPABILITY`.
+- `MODIFY_POWER` does not alter base Power. The wording "set Power to 0" has its own semantics under CR 4-12 and is neither `SET_BASE_POWER` nor `MODIFY_POWER`; because FCL 1.2.0 has no specific instruction for this procedure, it is `BLOCKED_CAPABILITY`.
 - Power may become negative without moving the card. Negative effective Cost is treated as zero outside calculations; the negative value may participate in calculations according to the CR.
 - Generic effect negation, granting abilities, prohibiting actions, and modifying procedures are blocked in this version; they must not be approximated through Keyword removal or `MOVE_CARD`.
 - `BLOCKER` is not generic redirection; the engine executes the Keyword's procedure.
+- A `REMAINDER` step does not create a new LOOK, reveal cards, or change information permissions. It identifies only the portion of an earlier LOOK result that remains eligible under §15.3.
+- Placing a remainder set at the bottom of a Deck is a group-positioning instruction. It must preserve the order choice required by the card text and CR.
 
 ## 20. Continuous Effects — `continuous`
 
 `continuous` represents a continuous consequence, not a sequence of actions.
 
 Exactly one of `subject` or `scope` must identify where the effect applies.
+
+Both `subject` and `scope` are fields inside the `continuous` object. They must not be declared as sibling fields of the effect declaration.
 
 Remaining fields depend on `kind`:
 
@@ -1283,7 +1467,7 @@ A `PERMANENT` effect uses optional `valid_when` (omitted = always valid, subject
 
 `SET_BASE_POWER` and `SET_BASE_COST` modify base values and follow normative precedence. When present for `PERMANENT`, `valid_when` is not repeated inside `continuous`.
 
-`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION`, and `MODIFY_PROCEDURE` are outside the executable 1.1.0 profile. If the text requires any of these capabilities, use `BLOCKED_CAPABILITY`.
+`GRANT_ABILITY`, `NEGATE_EFFECT`, `PROHIBIT_ACTION`, and `MODIFY_PROCEDURE` are outside the executable 1.2.0 profile. If the text requires any of these capabilities, use `BLOCKED_CAPABILITY`.
 
 Replacement Effects remain exclusively `category = "REPLACEMENT"` (§16).
 
@@ -1351,18 +1535,31 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - each `printing_id` resolves to exactly one `editorial.printings.art_id`;
 - `default_printing_id` resolves to exactly one `editorial.printings.art_id` whenever printing overrides exist;
 - `optional` is boolean and appears only in payment tables;
-- no `null`, duplicate keys, or TOML types outside the profile.
+- no `null`, duplicate keys, or TOML types outside the profile;
+- every `PERMANENT` effect has `scope` and `continuous` in the structure required by §20;
+- `continuous.subject` or `continuous.scope` appears inside `continuous`, never as a sibling field of the effect declaration;
+- a `REST_CARD` payment contains exactly one of `selection` or `subject`;
+- `REST_CARD.subject`, when present, is exactly `SOURCE`;
+- a `PLACE_HAND_CARD_BOTTOM_DECK` payment contains the required payment-selection structure;
+- a `REMAINDER` step contains only the fields defined in §15.3;
+- `REMAINDER.excluding` contains only compatible earlier `SELECT` step IDs;
+- `POSITION_CARD` references a compatible singular object or set-producing result;
+- no blocked ability is presented as executable.
 
 ### 23.3 Referential
 
 - every reference uses an authorized form from §14;
 - `source_refs`, `replacement.target.rule_ref`, and `translation.blockers.references` point to existing IDs in `[source.references]`;
-- selection references point to a compatible earlier `SELECT` in the same effect;
+- selection references point to a compatible earlier `SELECT` or `REMAINDER` in the same effect;
 - `depends_on` points to a compatible previous step;
 - area identifies a valid player and name;
 - property/state is applicable to the object;
 - every `EVENT_ACTIVATED_BY` Condition refers to an `AFTER_EVENT_CARD_RESOLUTION` timing context;
 - every color-set comparison references two compatible card objects;
+- every `REMAINDER.look_step` points to an earlier `LOOK` step in the same effect;
+- every ID in `REMAINDER.excluding` points to an earlier `SELECT` step in the same effect;
+- each excluded selection must use `information_step` pointing to the same LOOK result referenced by `REMAINDER.look_step`;
+- a `SELECTED_SET` reference to `REMAINDER` must point to an earlier `REMAINDER` step;
 - no arbitrary instance-ID access.
 
 ### 23.4 Semantic
@@ -1374,10 +1571,17 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - cost separated from resolution;
 - optional payment separated from quantity choice;
 - Life-to-hand payment uses the top Life card procedure and does not create damage or Trigger;
+- hand-to-bottom-of-Deck payment occurs before resolution and does not shuffle the Deck;
+- source-instance REST_CARD payment identifies and rests the exact SOURCE;
 - selection preserves object, area, filter, cardinality, chooser, and information;
+- LOOK results preserve the identity of the examined cards;
+- REMAINDER includes only the appropriate remaining cards from its referenced LOOK result;
+- excluded selections are not accidentally placed in the remainder;
+- cards moved out of the LOOK area before REMAINDER evaluation are not included;
 - mode choice separated from selection;
 - executor separated from chooser;
 - `if`, `then`, and `if you do` remain distinct;
+- explicit textual `Then` clauses are represented with `THEN` when applicable;
 - operations correspond to official procedures;
 - ordering and simultaneity preserved;
 - multi-color comparisons use the complete color sets;
@@ -1385,6 +1589,8 @@ The file must be valid UTF-8 TOML 1.0.0. A parser error terminates validation.
 - continuous effects have subject/scope, validity, and duration;
 - Replacement Effects contain every element required by §16;
 - K.O., Trash, damage, Life, Trigger, playing a card, and DON!! −X remain distinct;
+- `PERMANENT.continuous` contains its subject/scope in the correct nested structure;
+- type arrays preserve individual official type boundaries;
 - any semantics that cannot be substantiated result in blocking.
 
 ### 23.5 Normative
@@ -1403,6 +1609,12 @@ Printing-specific overrides require reliable evidence that the physical printing
 
 `SUPPORTED` is not permitted when the translator has merely assumed the current text, printing characteristics, or applicable rule.
 
+Official card names and printed type boundaries must not be inferred from provider-specific suffixes, concatenation, internal identifiers, or artwork labels.
+
+When a provider's card name includes a non-official suffix, the translator must establish whether that suffix is part of the official card name before populating `card.name`.
+
+When a provider's type field concatenates multiple characteristics, the translator must establish the individual official types before populating `card.types`.
+
 ## 24. Blocking Policy
 
 Possible states are defined in §8.
@@ -1419,11 +1631,13 @@ The translating LLM must block whenever it cannot establish, from the current te
 - validity, scope, or duration;
 - the consequence of `if you do`;
 - card/instance identity or applicable text version;
-- the correct gameplay characteristics of a physical printing when the raw data conflicts and no reliable source resolves the difference.
+- the correct gameplay characteristics of a physical printing when the raw data conflicts and no reliable source resolves the difference;
+- the boundaries of printed card types when authoritative information cannot establish them;
+- the exact set of cards to be moved when the required source/result set cannot be identified by an existing construct.
 
 `BLOCKED_NORMATIVE` means that normative support or official clarification is missing.
 
-`BLOCKED_CAPABILITY` means that the semantics are known, but the 1.1.0 profile has no construct to represent them.
+`BLOCKED_CAPABILITY` means that the semantics are known, but the 1.2.0 profile has no construct to represent them.
 
 `INVALID_SOURCE` means that the text, errata, language/region, or source data are insufficient or inconsistent.
 
@@ -1432,6 +1646,9 @@ Do not use `BLOCKED_CAPABILITY` for:
 - Event activation timing after resolution, which is represented by `AFTER_EVENT_CARD_RESOLUTION`;
 - identifying the Event activator, which is represented by `EVENT_ACTIVATED_BY`;
 - optional Life-to-hand payments, which are represented by `ADD_LIFE_TO_HAND`;
+- hand-to-bottom-of-Deck payments, which are represented by `PLACE_HAND_CARD_BOTTOM_DECK`;
+- direct source-instance REST_CARD payments, which are represented by `REST_CARD.subject = SOURCE`;
+- LOOK-result remainder manipulation, which is represented by `REMAINDER`;
 - color comparisons between multicolor cards, which are represented by `COLOR_SET_COMPARE`;
 - printing-specific gameplay characteristic differences that are verified and represented by `card.printing_overrides`.
 
@@ -1442,10 +1659,12 @@ The translator must never invent an enumeration, opcode, property, player, or ex
 ## 25. Versioning and Compatibility
 
 - `language_version` identifies FCL's textual structure, catalog, and semantics.
-- Version 1.1.0 adds compatible capabilities to 1.0.0 without changing the meaning of existing 1.0.0 constructs.
+- Version 1.1.0 added compatible capabilities to 1.0.0 without changing the meaning of existing 1.0.0 constructs.
+- Version 1.2.0 adds compatible capabilities to 1.1.0 without changing the meaning of existing 1.1.0 or 1.0.0 constructs.
 - Existing documents using only 1.0.0 constructs may remain at `language_version = "1.0.0"`.
-- A document using any construct introduced in 1.1.0 must declare `language_version = "1.1.0"`.
-- A compiler may support both explicitly declared versions, but it must not silently reinterpret a document from one version as another.
+- Existing documents using 1.1.0 constructs may remain at `language_version = "1.1.0"`.
+- A document using any construct introduced in 1.2.0 must declare `language_version = "1.2.0"`.
+- A compiler may support multiple explicitly declared versions, but it must not silently reinterpret a document from one version as another.
 - Unknown fields are rejected, except for scalar keys in `[editorial.extra]`.
 - Incompatible changes to structure, enumeration, type, or meaning require a new major version.
 - A compatible extension that does not change existing meanings requires a new minor version.
@@ -1461,7 +1680,7 @@ The following examples demonstrate TOML structure. They are syntactic examples a
 
 ```toml
 format = "FL_CARD_LANGUAGE"
-language_version = "1.1.0"
+language_version = "1.2.0"
 
 [card]
 number = "EXAMPLE-001"
@@ -1491,8 +1710,7 @@ status = "SUPPORTED"
 id = "E1"
 category = "PERMANENT"
 valid_when = { all = [{ test = "DON_GIVEN_TO_SOURCE", operator = "GTE", value = { literal = 1 } }, { test = "PLAYER_TURN", value = "YOUR_TURN" }] }
-scope = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }], player = { kind = "PLAYER", role = "YOU" } }
-continuous = { kind = "MODIFY_POWER", operator = "ADD", value = { literal = 1000 } }
+continuous = { scope = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }], player = { kind = "PLAYER", role = "YOU" } }, kind = "MODIFY_POWER", operator = "ADD", value = { literal = 1000 } }
 ```
 
 ### 26.2 Auto Effect with Ordered Resolution
@@ -1749,9 +1967,175 @@ When card text instructs the player to return a selected card to its owner's han
 
 The engine resolves `OWNER` relative to the card being moved.
 
+### 26.11 Hand-to-Bottom-of-Deck Activation Cost — Gordon
+
+This example represents an optional payment that places one card from the payer's Hand at the bottom of their Deck before resolving the effect.
+
+```toml
+[[source.references]]
+id = "CR-8-3-1-4"
+kind = "CR"
+document = "ONE_PIECE_CARD_GAME_COMPREHENSIVE_RULES"
+version = "1.2.1"
+section = "8-3-1-4"
+url = "https://en.onepiece-cardgame.com/pdf/rule_comprehensive.pdf?20260828="
+
+[[abilities]]
+id = "A1"
+source_text = "[On Play] You may place 1 card from your hand at the bottom of your deck: Draw 1 card."
+status = "SUPPORTED"
+source_refs = ["CR-8-3-1-4"]
+
+[[abilities.effects]]
+id = "E1"
+category = "AUTO"
+timing = "ON_PLAY"
+effect_form = "ONE_SHOT"
+activation_costs = [
+  { kind = "PLACE_HAND_CARD_BOTTOM_DECK",
+    payer = { kind = "PLAYER", role = "YOU" },
+    selection = {
+      object = "CARD",
+      areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }],
+      quantity = { mode = "FIXED", value = { literal = 1 } },
+      chooser = { kind = "PLAYER", role = "YOU" },
+      information = "OWNER_PRIVATE_INFORMATION"
+    },
+    optional = true
+  }
+]
+resolution = [
+  { id = "S1", kind = "OPERATION", operation = "DRAW", player = { kind = "PLAYER", role = "YOU" }, quantity = { mode = "FIXED", value = { literal = 1 } } }
+]
+```
+
+The payment is an optional Activation Cost. Declining it prevents the effect from activating. The selected card is placed at the bottom of the payer's Deck during payment processing, not during resolution.
+
+### 26.12 Source-Instance REST_CARD Payment — Hyogoro
+
+This example represents an Activate Effect whose optional cost is resting the source Character itself.
+
+```toml
+[[abilities]]
+id = "A1"
+source_text = "[Activate:Main] You may rest this Character: Up to 1 of your Leader or Character cards gains +2000 power during this turn."
+status = "SUPPORTED"
+
+[[abilities.effects]]
+id = "E1"
+category = "ACTIVATE"
+activation_window = "MAIN_PHASE"
+effect_form = "ONE_SHOT"
+activation_costs = [
+  { kind = "REST_CARD",
+    payer = { kind = "PLAYER", role = "YOU" },
+    subject = { kind = "SOURCE" },
+    optional = true
+  }
+]
+resolution = [
+  { id = "S1",
+    kind = "SELECT",
+    object = "CARD",
+    areas = [
+      { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "LEADER_AREA" },
+      { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }
+    ],
+    quantity = { mode = "UP_TO", maximum = { literal = 1 } },
+    chooser = { kind = "PLAYER", role = "YOU" },
+    information = "PUBLIC_INFORMATION"
+  },
+  { id = "S2",
+    kind = "OPERATION",
+    operation = "MODIFY_POWER",
+    selection = "S1",
+    operator = "ADD",
+    value = { literal = 2000 },
+    duration = { kind = "THIS_TURN" }
+  }
+]
+```
+
+The cost identifies the source instance directly. It cannot be paid by resting another Character.
+
+### 26.13 LOOK Remainder — Nami
+
+This example represents examining the top five cards of the Deck, optionally selecting and adding one eligible Character to the Hand, and then placing the remaining examined cards at the bottom of the Deck in an order chosen by the player.
+
+```toml
+[[abilities]]
+id = "A1"
+source_text = "[On Play] Look at 5 cards from the top of your deck; reveal up to 1 \"Straw Hat Crew\" type Character card other than [Nami] and add it to your hand. Then, place the rest at the bottom of your deck in any order."
+status = "SUPPORTED"
+
+[[abilities.effects]]
+id = "E1"
+category = "AUTO"
+timing = "ON_PLAY"
+effect_form = "ONE_SHOT"
+resolution = [
+  { id = "S1",
+    kind = "OPERATION",
+    operation = "LOOK",
+    area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "DECK" },
+    player = { kind = "PLAYER", role = "YOU" },
+    quantity = { mode = "FIXED", value = { literal = 5 } }
+  },
+  { id = "S2",
+    kind = "SELECT",
+    object = "CARD",
+    areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "DECK" }],
+    filter = { all = [
+      { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } },
+      { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "TYPE", operator = "EQ", value = { literal = "Straw Hat Crew" } },
+      { not = { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "NAME", operator = "EQ", value = { literal = "Nami" } } }
+    ] },
+    quantity = { mode = "UP_TO", maximum = { literal = 1 } },
+    chooser = { kind = "PLAYER", role = "YOU" },
+    information = "LOOKED_BY_CHOOSER",
+    information_step = "S1"
+  },
+  { id = "S3",
+    kind = "OPERATION",
+    operation = "REVEAL",
+    selection = "S2"
+  },
+  { id = "S4",
+    kind = "OPERATION",
+    operation = "RETURN_CARD",
+    selection = "S2",
+    destination_area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }
+  },
+  { id = "S5",
+    kind = "THEN",
+    steps = [
+      { id = "S5A",
+        kind = "REMAINDER",
+        look_step = "S1",
+        excluding = ["S2"]
+      },
+      { id = "S5B",
+        kind = "OPERATION",
+        operation = "POSITION_CARD",
+        selection = "S5A",
+        destination_area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "DECK" },
+        position = "BOTTOM",
+        order_chooser = { kind = "PLAYER", role = "YOU" }
+      }
+    ]
+  }
+]
+```
+
+The selection is restricted to the LOOK result. `REMAINDER` excludes the selected card and includes the other cards from the LOOK result that remain in the Deck.
+
+The `POSITION_CARD` operation positions the remainder as a group and preserves the player's ordering choice.
+
+The example is a structural illustration of the FCL 1.2.0 constructs. It does not replace checking the current official card text and applicable official rules.
+
 ## 27. Conformance
 
-A program conforms to FCL 1.1.0 only when:
+A program conforms to FCL 1.2.0 only when:
 
 1. it is valid TOML 1.0.0;
 2. it uses `format = "FL_CARD_LANGUAGE"` and declares an explicitly supported `language_version`;
@@ -1764,11 +2148,11 @@ A program conforms to FCL 1.1.0 only when:
 
 Program conformance, compiler coverage, and engine coverage are three distinct checks.
 
-A 1.0.0 document remains a 1.0.0 document unless it uses a construct introduced in 1.1.0. A program must not silently receive 1.1.0 semantics merely because it is processed by a newer compiler.
+A 1.0.0 or 1.1.0 document remains at its declared version unless it uses a construct introduced in a later version. A program must not silently receive 1.2.0 semantics merely because it is processed by a newer compiler.
 
-## 28. Version 1.1.0 Freeze
+## 28. Version 1.2.0 Freeze
 
-FCL 1.1.0 freezes:
+FCL 1.2.0 freezes:
 
 - TOML 1.0.0 as the textual format;
 - one file per logical card identity;
@@ -1778,6 +2162,10 @@ FCL 1.1.0 freezes:
 - the `AFTER_EVENT_CARD_RESOLUTION` Auto Effect timing;
 - the `EVENT_ACTIVATED_BY` contextual condition;
 - `ADD_LIFE_TO_HAND` payment and explicit optional-payment semantics;
+- `PLACE_HAND_CARD_BOTTOM_DECK` payment;
+- direct `REST_CARD.subject = SOURCE` payment;
+- `REMAINDER` for the remainder of a LOOK result;
+- `THEN` clause-boundary representation;
 - printing-specific gameplay overrides through `card.printing_overrides`;
 - `COLOR_SET_COMPARE` and multicolor-aware color comparison semantics;
 - Trigger and Event card activation handling;
@@ -1792,7 +2180,7 @@ Cases outside the profile remain blocked; they do not silently change the frozen
 
 To change semantics or structure, open an extension proposal, document the card/text/rule requiring the capability, demonstrate why existing constructs are insufficient, define its interaction with the current profile, and publish a new version.
 
-Do not edit the meaning of FCL 1.1.0 during card translation.
+Do not edit the meaning of FCL 1.2.0 during card translation.
 
 ## 29. Engine Boundaries and Additional Normative Semantics
 
@@ -1900,6 +2288,12 @@ When multiple players must make choices simultaneously, the Turn Player chooses 
 
 When multiple cards are simultaneously placed in an area, the owner determines their order under the CR, unless a different rule/text applies.
 
+A LOOK result is a temporary set of card instances identified by the engine. Its members retain their identity for subsequent selection, reveal, movement, exclusion, and remainder operations within the same resolution.
+
+A remainder set is computed from the referenced LOOK result at the time its `REMAINDER` step is reached. Cards already moved out of the examined area are not part of the remainder. Cards explicitly excluded by earlier compatible selections are also not part of the remainder.
+
+A remainder set does not create a new area, grant new information, or authorize arbitrary access to the Deck.
+
 ### 29.4 Resolution and Impossibility
 
 Resolution follows textual order.
@@ -1924,6 +2318,8 @@ An accepted optional payment and an `UP_TO` quantity choice are separate decisio
 
 Mode choice, `UP_TO` selection, and optional actions during resolution are not costs.
 
+A `THEN` node marks the next textual clause. It does not manufacture a dependency on complete success of the preceding clause.
+
 ### 29.5 Continuous Effects, Negation, and Prohibition
 
 A Permanent Effect remains valid while its condition and the rules permit it.
@@ -1934,7 +2330,7 @@ Continuous effects are applied/stabilized by the engine in Turn Player, Non-Turn
 
 Prohibiting an action, negating/invalidating an effect, and an operation being impossible are different phenomena.
 
-FCL 1.1.0 has no generic instructions for the first two; when the text requires these behaviors, block translation.
+FCL 1.2.0 has no generic instructions for the first two; when the text requires these behaviors, block translation.
 
 The VM must not simulate them through Keyword removal or movement operations.
 
@@ -1999,3 +2395,7 @@ Relevant rules include:
 The OP01-004 answer establishes that the ability triggered by an opponent activating an Event activates after the Event has been activated and its effect has resolved. It also distinguishes Event activation from activating an Event's Trigger.
 
 These references establish only the specific rules and FAQ interpretations cited. They do not certify that every card, FAQ, erratum, printing, or game interaction has been audited.
+
+---
+
+**End of FCL Specification 1.2.0.**
