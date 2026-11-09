@@ -56,21 +56,11 @@ Its architecture may inspire similar projects, but its grammar, semantics, and i
 
 The normative specification is maintained in a single document:
 
-`FL_CARD_LANGUAGE_SPEC_v1.0.0.md`
+[`language_spec.md`](language_spec.md)
 
 It contains the language grammar, semantic contract, supported constructs, validation requirements, and TOML examples.
 
-This document is the sole normative reference for version 1.0.0.
-
-## Status
-
-**Version 1.0.0 — Frozen**
-
-The specification is frozen for initial card translation and validation experiments.
-
-This does not imply that every One Piece Card Game card or mechanic is already supported by an implementation.
-
-Cards requiring unsupported or unresolved mechanics must be explicitly marked as blocked rather than translated using speculative semantics.
+This document is the sole normative reference in the development process.
 
 ## License MIT
 
