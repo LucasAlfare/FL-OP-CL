@@ -1,8 +1,7 @@
-# FL Card Language (FCL) — Specification 1.6.0
+# FL Card Language (FCL) — Specification 1.7.0
 
 Normative document: `language_spec.md`\
 Textual format: TOML 1.0.0\
-Specification date: November 9, 2026\
 Status: `FROZEN — READY FOR CARD-TRANSLATION TESTING`
 
 ## 1. Purpose and Authority
@@ -13,11 +12,9 @@ Cards declare behavior, official rules establish procedures and consequences, an
 
 FCL is not a general-purpose programming language. It does not support Kotlin code, user-defined functions, callbacks, mutable variables, arbitrary state access, unrestricted loops, or recursion.
 
-FCL 1.6.0 defines the complete textual format, semantic profile, vocabularies, effects, conditions, selections, payments, resolution structures, continuous effects, Replacement Effects, validation rules, and blocking policy. It supersedes previous specifications and addenda.
+FCL defines the complete textual format, semantic profile, vocabularies, effects, conditions, selections, payments, resolution structures, continuous effects, Replacement Effects, validation rules, and blocking policy. It supersedes previous specifications and addenda.
 
 The external syntax is TOML 1.0.0. FCL defines a closed set of permitted structures, fields, types, enumerations, and semantic invariants. `language_version` identifies the language structure and semantics.
-
-FCL 1.6.0 is an additive extension of 1.5.0. Existing constructs retain their previous meanings.
 
 `FROZEN` means that the language contract is closed and ready for card-translation testing. It does not imply complete coverage of published cards or an implemented compiler and VM.
 
@@ -908,6 +905,7 @@ Within `PREVENT_BATTLE_KO.attacker_condition`, `ATTACKER` is the actual attacker
 
 Never infer `ATTACKER` from the Turn Player, source card, or controller.
 
+
 ## 13. Values
 
 Values use inline objects containing exactly one form:
@@ -920,6 +918,53 @@ Values use inline objects containing exactly one form:
 - `don_count = { player = PLAYER_REF, scope = "FIELD" }`.
 - `don_given = { subject = REF }`.
 - `sum_cost = { selection = "selection_id" }`.
+- `scale = { count = COUNT_VALUE, multiplier = INTEGER }`.
+
+### 13.1 Count-Scaled Values
+
+`scale` multiplies a supported dynamic count by a fixed positive integer:
+
+`result = count × multiplier`
+
+`COUNT_VALUE` must be an inline Value object containing exactly one of:
+
+- `count_area`
+- `count_objects`
+- `count_selection`
+- `don_count`
+- `don_given`
+
+Restrictions:
+
+1. `count` must produce a non-negative integer.
+2. `multiplier` must be a positive TOML integer greater than zero.
+3. Nested `scale` expressions are forbidden.
+4. `literal`, `property`, and `sum_cost` are not valid `scale.count` sources.
+5. The resulting value is a non-negative integer.
+6. `scale` is permitted only where a numeric Value is accepted.
+7. All references and filters within `COUNT_VALUE` retain the rules and restrictions of their original Value forms.
+8. Multiplication uses exact integer arithmetic. Implementations must not silently round, wrap, or saturate the result.
+
+`scale` represents one calculated numeric value. It does not repeat an operation, create a loop, or execute a separate instruction for each counted object.
+
+### 13.2 Evaluation
+
+The underlying count is evaluated at the evaluation point established by the structure consuming the Value.
+
+For resolution steps, conditions, and other one-time evaluations, use the evaluation point defined by the corresponding construct and applicable rules.
+
+For continuous effects:
+
+- Evaluate the current count whenever the engine evaluates the continuous effect.
+- Recalculate the resulting value using the current game state.
+- Do not snapshot the first calculated value when the effect activates, enters the Field, or is initially evaluated.
+- Changes to the counted objects must be reflected through the engine's normal continuous-effect evaluation and stabilization procedures.
+
+The engine remains responsible for continuous-effect timing, ordering, precedence, and stabilization under the Comprehensive Rules. `scale` does not introduce additional game events or evaluation checkpoints.
+
+If evaluation involves a circular dependency that cannot be resolved by applicable official rules, use `BLOCKED_NORMATIVE` rather than inventing an evaluation order.
+
+### 13.3 Existing Value Rules
 
 `don_count.scope` accepts only:
 
@@ -929,15 +974,13 @@ Values use inline objects containing exactly one form:
 
 `property.name` uses the queryable properties in §12.1.
 
-Filters use `CANDIDATE`.
-
 `count_selection` and `sum_cost.selection` must reference a compatible earlier selection in the same resolution.
 
 `count_area.area` is an AREA reference.
 
-`count_objects` requires `object`, `areas`, and `player`; `filter` is optional.
+The count sources accepted by `scale` retain their original evaluation and referential constraints.
 
-No general variables, functions, arbitrary ID access, or arithmetic exist.
+FCL permits only the explicitly defined `scale` multiplication. General arithmetic, addition expressions, subtraction expressions, division, arbitrary formulas, variables, functions, and arbitrary ID access remain unsupported.
 
 ## 14. References
 
@@ -1758,7 +1801,7 @@ When a selected card moves to an area whose player is `OWNER`, resolve the desti
 - `PLAY_CARD` performs official play legality, cost/waiver, destination, and entry timing.
 - DON!! in DON!! Deck, Cost Area, and attached to cards are distinct.
 - `MODIFY_POWER` does not modify base Power.
-- Setting Power to zero follows the CR 4-12 procedure; FCL 1.6.0 has no specific operation for it, so block it.
+- Setting Power to zero follows the CR 4-12 procedure; FCL has no specific operation for it, so block it.
 - Power may become negative without moving a card.
 - Negative effective Cost is zero outside calculations, but may participate in calculations according to CR.
 - Generic effect negation, arbitrary ability granting, generic action prohibition, and arbitrary procedure modification remain unsupported.
@@ -2266,48 +2309,6 @@ Never convert a blocker into an empty operation, default value, approximated bra
 
 Never invent an enumeration, opcode, property, player, or exception.
 
-## 25. Versioning and Compatibility
-
-`language_version` identifies structure, catalog, and semantics.
-
-Compatible versions:
-
-- 1.1.0 extends 1.0.0.
-- 1.2.0 extends 1.1.0.
-- 1.3.0 extends 1.2.0.
-- 1.4.0 extends 1.3.0.
-- 1.5.0 extends 1.4.0.
-- 1.6.0 extends 1.5.0.
-
-Previous meanings remain unchanged.
-
-Requirements:
-
-- Documents using only 1.0.0 constructs may remain at 1.0.0.
-- Documents using 1.1.0 constructs require at least 1.1.0.
-- Documents using 1.2.0 constructs require at least 1.2.0.
-- Documents using 1.3.0 constructs require at least 1.3.0.
-- Documents using `RETURN_CHARACTER_TO_OWNER_HAND` require at least 1.4.0.
-- Documents using `RESTRICT_ATTACK_TARGETS` require at least 1.5.0.
-- Documents using multi-card `REST_CARD.selection` require at least 1.5.0.
-- Documents using `ON_OPPONENT_CHARACTER_KO` require at least 1.6.0.
-- A compiler may support multiple versions but must not silently reinterpret them.
-- Unknown keys are rejected except scalar values in `[editorial.extra]`.
-- Incompatible changes to structure, types, enumerations, or meanings require a new major version.
-- Compatible additive extensions require a new minor version.
-- Non-semantic textual corrections may receive a patch release without changing language version.
-- Any change to construct meaning requires a new version.
-- Unsupported versions must be rejected.
-
-The additions in 1.6.0 are additive:
-
-1. `ON_OPPONENT_CHARACTER_KO`, a narrowly defined Auto Effect timing.
-2. Explicit event-context identity and `EVENT_OBJECT` semantics for that timing.
-3. Event-time activation-condition evaluation, consistent with the official OP01-061 FAQ.
-4. Validation and blocking rules for the new timing and reference.
-
-All existing 1.5.0 programs preserve their semantics.
-
 ## 26. Reference Examples
 
 Examples demonstrate structures and do not replace checking actual text, CR, FAQ, or errata.
@@ -2587,7 +2588,7 @@ This example does not require a separate `ERRATA` reference merely because the o
 
 ## 27. Conformance
 
-A document conforms to FCL 1.6.0 when:
+A document conforms to FCL when:
 
 1. It is valid TOML 1.0.0.
 2. It declares `format = "FL_CARD_LANGUAGE"` and an explicitly supported `language_version`.
@@ -2601,6 +2602,7 @@ A document conforms to FCL 1.6.0 when:
 10. Every `RESTRICT_ATTACK_TARGETS` declaration follows §20.3.
 11. Every multi-card `REST_CARD.selection` follows §§17.2 and 17.3.
 12. Every `ON_OPPONENT_CHARACTER_KO` declaration and associated `EVENT_OBJECT` usage follows §§11.1, 12, and 14.
+13. Every `scale` expression follows the count-source, multiplier, numeric-value, and evaluation rules of §13.
 
 `SUPPORTED` is a translation conclusion, not proof that the VM implements every game rule.
 
