@@ -1,8 +1,8 @@
-# FL Card Language (FCL) — Specification 1.7.0
+# FL Card Language (FCL) — Specification 1.8.0
 
-Normative document: `language_spec.md`\
-Textual format: TOML 1.0.0\
-Status: `FROZEN — READY FOR CARD-TRANSLATION TESTING`
+**Normative document:** `language_spec.md`  
+**Textual format:** TOML 1.0.0  
+**Status:** `FROZEN — READY FOR CARD-TRANSLATION TESTING`
 
 ## 1. Purpose and Authority
 
@@ -36,6 +36,7 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - Event activation and Event-resolution timing.
 - Opponent Character K.O. timing and contextual event references.
 - Values, references, selections, quantities, and information.
+- Dynamic counting, complete-group counting, and fixed-integer scaling.
 - Activation costs and supported payments.
 - Optional payments and their distinct semantics.
 - Life-to-hand payments.
@@ -47,6 +48,7 @@ The normative foundation is the ONE PIECE CARD GAME Comprehensive Rules v1.2.1 (
 - LOOK-result manipulation and remainder sets.
 - Additional attack-target permissions.
 - Restrictions on attack targets.
+- Prevention of specified attack declarations.
 - Prevention of K.O. caused by specified battle attackers.
 - Enumerated game operations.
 - Continuous effects, scope, validity, and duration.
@@ -80,7 +82,7 @@ Deck construction effects are outside the executable gameplay profile. Editorial
 8. Multicolor cards possess every printed color. Comparisons use complete color sets.
 9. LOOK results are temporary identified sets, not permanent selections or independent areas.
 10. `SOURCE` identifies an exact instance, never an arbitrary substitute.
-11. Attack-target permissions, attack-target restrictions, and battle K.O. prevention are distinct, narrowly defined continuous consequences. None is a generic mechanism for modifying game rules.
+11. Attack-target permissions, attack-target restrictions, attack-declaration prevention, and battle K.O. prevention are distinct, narrowly defined consequences. None is a generic mechanism for modifying game rules.
 12. A `SUPPORTED` translation requires structural validation, semantic completeness, and normative justification.
 13. Event-triggered effects must preserve the identity and relevant context of the event that fulfilled their timing. Subsequent state changes must not retroactively alter event-time conditions when official rules establish that those conditions are evaluated at the event.
 
@@ -134,20 +136,20 @@ Printing-specific gameplay characteristics are gameplay data and must be availab
 
 The language accepts TOML 1.0.0 only.
 
-| Rule           | Requirement                                                       |
-| -------------- | ----------------------------------------------------------------- |
-| Encoding       | UTF-8                                                             |
-| Keys           | Case-sensitive `snake_case`                                       |
-| Enumerations   | Strings in `UPPER_SNAKE_CASE`                                     |
-| IDs            | Stable strings, unique in their defined scope                     |
-| Arrays         | Order matters for sequences, choices, alternatives, and printings |
-| Tables         | Physical order has no semantic meaning                            |
-| Missing values | Omit inapplicable fields; TOML has no `null`                      |
-| Unknown keys   | Reject, except authorized `[editorial.extra]`                     |
-| Duplicate keys | Reject                                                            |
-| Dates          | ISO `YYYY-MM-DD` strings                                          |
-| Numbers        | Decimal integers unless a string representation is specified      |
-| Comments       | Allowed; no gameplay meaning                                      |
+| Rule | Requirement |
+|---|---|
+| Encoding | UTF-8 |
+| Keys | Case-sensitive `snake_case` |
+| Enumerations | Strings in `UPPER_SNAKE_CASE` |
+| IDs | Stable strings, unique in their defined scope |
+| Arrays | Order matters for sequences, choices, alternatives, and printings |
+| Tables | Physical order has no semantic meaning |
+| Missing values | Omit inapplicable fields; TOML has no `null` |
+| Unknown keys | Reject, except authorized `[editorial.extra]` |
+| Duplicate keys | Reject |
+| Dates | ISO `YYYY-MM-DD` strings |
+| Numbers | Decimal integers unless a string representation is specified |
+| Comments | Allowed; no gameplay meaning |
 
 Do not use YAML features, custom tags, aliases, or free-form text in place of required semantic structures.
 
@@ -179,9 +181,9 @@ The only permitted top-level keys/tables are:
 
 Structural example:
 
-```
+```toml
 format = "FL_CARD_LANGUAGE"
-language_version = "1.6.0"
+language_version = "1.8.0"
 
 [card]
 number = "EXAMPLE-001"
@@ -209,19 +211,19 @@ status = "SUPPORTED"
 
 Permitted fields:
 
-| Field                 | Type             | Requirement                            |
-| --------------------- | ---------------- | -------------------------------------- |
-| `number`              | string           | Required; official card number         |
-| `name`                | string           | Required; official card name           |
-| `category`            | enum             | Required                               |
-| `colors`              | array of enums   | Required; non-empty                    |
-| `types`               | array of strings | Printed types                          |
-| `attributes`          | array of enums   | Leader/Character only                  |
-| `cost`                | integer          | Character/Event/Stage only             |
-| `power`               | integer          | Leader/Character only                  |
-| `life`                | integer          | Leader only                            |
-| `counter`             | integer          | Character only                         |
-| `default_printing_id` | string           | Required when printing overrides exist |
+| Field | Type | Requirement |
+|---|---|---|
+| `number` | string | Required; official card number |
+| `name` | string | Required; official card name |
+| `category` | enum | Required |
+| `colors` | array of enums | Required; non-empty |
+| `types` | array of strings | Printed types |
+| `attributes` | array of enums | Leader/Character only |
+| `cost` | integer | Character/Event/Stage only |
+| `power` | integer | Leader/Character only |
+| `life` | integer | Leader only |
+| `counter` | integer | Character only |
+| `default_printing_id` | string | Required when printing overrides exist |
 
 ### 6.1 Enumerations and Types
 
@@ -257,7 +259,7 @@ Every distinct official type occupies one array element.
 
 Example:
 
-```
+```toml
 types = ["Fish-Man", "Straw Hat Crew"]
 ```
 
@@ -279,16 +281,16 @@ Do not populate inapplicable fields with zero or empty strings. Absence and nume
 
 Each entry accepts:
 
-| Field         | Type    | Requirement                             |
-| ------------- | ------- | --------------------------------------- |
-| `printing_id` | string  | Required; matches an editorial `art_id` |
-| `colors`      | array   | Optional override                       |
-| `types`       | array   | Optional override                       |
-| `attributes`  | array   | Optional override                       |
-| `cost`        | integer | Optional override                       |
-| `power`       | integer | Optional override                       |
-| `life`        | integer | Optional override                       |
-| `counter`     | integer | Optional override                       |
+| Field | Type | Requirement |
+|---|---|---|
+| `printing_id` | string | Required; matches an editorial `art_id` |
+| `colors` | array | Optional override |
+| `types` | array | Optional override |
+| `attributes` | array | Optional override |
+| `cost` | integer | Optional override |
+| `power` | integer | Optional override |
+| `life` | integer | Optional override |
+| `counter` | integer | Optional override |
 
 `number`, `name`, and `category` cannot be overridden.
 
@@ -309,7 +311,7 @@ Only reliable official evidence authorizes an override. Unofficial API conflicts
 
 Example:
 
-```
+```toml
 [card]
 number = "OP01-008"
 name = "Cavendish"
@@ -357,19 +359,19 @@ All normative sources share one `[[source.references]]` list.
 
 Permitted fields:
 
-| Field      | Type   | Requirement                                 |
-| ---------- | ------ | ------------------------------------------- |
-| `id`       | string | Required; unique                            |
-| `kind`     | enum   | `CR`, `FAQ`, `ERRATA`, `OFFICIAL_CARD_TEXT` |
-| `document` | string | Required; identifiable document             |
-| `url`      | string | Required; actual source URL                 |
-| `version`  | string | Optional                                    |
-| `section`  | string | Optional                                    |
-| `date`     | string | Optional; ISO date                          |
+| Field | Type | Requirement |
+|---|---|---|
+| `id` | string | Required; unique |
+| `kind` | enum | `CR`, `FAQ`, `ERRATA`, `OFFICIAL_CARD_TEXT` |
+| `document` | string | Required; identifiable document |
+| `url` | string | Required; actual source URL |
+| `version` | string | Optional |
+| `section` | string | Optional |
+| `date` | string | Optional; ISO date |
 
 Example:
 
-```
+```toml
 [[source.references]]
 id = "CR-8-3-1-4"
 kind = "CR"
@@ -411,19 +413,19 @@ Permitted statuses:
 
 Blockers use `[[translation.blockers]]`.
 
-| Field            | Type   | Requirement                                                 |
-| ---------------- | ------ | ----------------------------------------------------------- |
-| `code`           | enum   | `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE` |
-| `scope`          | enum   | `CARD`, `ABILITY`, `EFFECT`                                 |
-| `ability_id`     | string | Required for ABILITY/EFFECT; forbidden for CARD             |
-| `effect_id`      | string | Required only for EFFECT                                    |
-| `source_excerpt` | string | Exact excerpt from `current_text`                           |
-| `reason`         | string | Required objective explanation                              |
-| `references`     | array  | Optional existing source IDs                                |
+| Field | Type | Requirement |
+|---|---|---|
+| `code` | enum | `BLOCKED_NORMATIVE`, `BLOCKED_CAPABILITY`, `INVALID_SOURCE` |
+| `scope` | enum | `CARD`, `ABILITY`, `EFFECT` |
+| `ability_id` | string | Required for ABILITY/EFFECT; forbidden for CARD |
+| `effect_id` | string | Required only for EFFECT |
+| `source_excerpt` | string | Exact excerpt from `current_text` |
+| `reason` | string | Required objective explanation |
+| `references` | array | Optional existing source IDs |
 
 Example:
 
-```
+```toml
 [translation]
 status = "BLOCKED_CAPABILITY"
 
@@ -494,7 +496,7 @@ Each printing accepts only:
 
 Example:
 
-```
+```toml
 [[editorial.printings]]
 set_id = "OP-01"
 rarity = "SR"
@@ -557,7 +559,7 @@ Other Keywords are represented according to their function: timing, condition, c
 
 `event_activation` describes authorization and procedure for activating the Event card itself, not its payment or a movement operation.
 
-```
+```toml
 event_activation = { window = "MAIN" }
 ```
 
@@ -666,7 +668,7 @@ Supported timings:
 
 #### Timing semantics
 
-Existing timings
+Existing timings:
 
 - `ON_KO` follows the official K.O. sequence for the source instance itself, including its prescribed source movement and resolution timing. Never substitute generic Trash for K.O.
 - `AFTER_EVENT_CARD_RESOLUTION` occurs only after an actual Event card activation has completely resolved. It does not occur for Event Trigger activation, ordinary Event movement, non-Event card effects, or mere revelation, selection, or Trash movement of an Event.
@@ -759,19 +761,19 @@ If a replacement procedure creates a continuous consequence, that consequence mu
 
 A Condition is an inline table containing exactly one form:
 
-```
+```toml
 all = [CONDITION, ...]
 ```
 
-```
+```toml
 any = [CONDITION, ...]
 ```
 
-```
+```toml
 not = CONDITION
 ```
 
-```
+```toml
 test = "TEST_NAME"
 ```
 
@@ -795,17 +797,17 @@ Evaluation point:
 
 ### 12.1 Tests and Fields
 
-| Test                  | Required fields                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `PROPERTY_COMPARE`    | `subject`, `property`, `operator`, `value`; for `INCLUSIVE_RANGE`, use `minimum` and `maximum` instead |
-| `PLAYER_TURN`         | `value`: `YOUR_TURN` or `OPPONENT_TURN`                                                                |
-| `DON_GIVEN_TO_SOURCE` | `operator`, `value`                                                                                    |
-| `DON_IN_FIELD`        | `player`, `operator`, `value`                                                                          |
-| `AREA_COUNT`          | `area`, `player`, `operator`, `value`                                                                  |
-| `OBJECT_COUNT`        | `object`, `areas`, `player`, `operator`, `value`                                                       |
-| `SUM_COST`            | `selection`, `operator`, `value`                                                                       |
-| `EVENT_ACTIVATED_BY`  | `player`                                                                                               |
-| `COLOR_SET_COMPARE`   | `subject`, `relation`, `other_subject`                                                                 |
+| Test | Required fields |
+|---|---|
+| `PROPERTY_COMPARE` | `subject`, `property`, `operator`, `value`; for `INCLUSIVE_RANGE`, use `minimum` and `maximum` instead |
+| `PLAYER_TURN` | `value`: `YOUR_TURN` or `OPPONENT_TURN` |
+| `DON_GIVEN_TO_SOURCE` | `operator`, `value` |
+| `DON_IN_FIELD` | `player`, `operator`, `value` |
+| `AREA_COUNT` | `area`, `player`, `operator`, `value` |
+| `OBJECT_COUNT` | `object`, `areas`, `player`, `operator`, `value` |
+| `SUM_COST` | `selection`, `operator`, `value` |
+| `EVENT_ACTIVATED_BY` | `player` |
+| `COLOR_SET_COMPARE` | `subject`, `relation`, `other_subject` |
 
 `PROPERTY_COMPARE.property` accepts:
 
@@ -839,6 +841,8 @@ Value types must match their properties:
 Undefined combinations are blocked.
 
 For `COLOR` with `EQ`, the comparison succeeds if the card possesses that color, including multicolor cards.
+
+For `TYPE` with `EQ`, the comparison succeeds if the subject possesses the specified effective type. This is a membership comparison, not equality of the entire types array. Multi-type cards match each type they possess.
 
 `COLOR_SET_COMPARE` compares complete sets of two card objects.
 
@@ -905,7 +909,6 @@ Within `PREVENT_BATTLE_KO.attacker_condition`, `ATTACKER` is the actual attacker
 
 Never infer `ATTACKER` from the Turn Player, source card, or controller.
 
-
 ## 13. Values
 
 Values use inline objects containing exactly one form:
@@ -918,15 +921,10 @@ Values use inline objects containing exactly one form:
 - `don_count = { player = PLAYER_REF, scope = "FIELD" }`.
 - `don_given = { subject = REF }`.
 - `sum_cost = { selection = "selection_id" }`.
+- `count_groups = { count = COUNT_SOURCE, group_size = INTEGER }`.
 - `scale = { count = COUNT_VALUE, multiplier = INTEGER }`.
 
-### 13.1 Count-Scaled Values
-
-`scale` multiplies a supported dynamic count by a fixed positive integer:
-
-`result = count × multiplier`
-
-`COUNT_VALUE` must be an inline Value object containing exactly one of:
+`COUNT_SOURCE` is a Value containing exactly one of:
 
 - `count_area`
 - `count_objects`
@@ -934,20 +932,64 @@ Values use inline objects containing exactly one form:
 - `don_count`
 - `don_given`
 
+`COUNT_VALUE` is a Value containing either one `COUNT_SOURCE` form or `count_groups`.
+
+### 13.1 Count Groups
+
+`count_groups` calculates the number of complete, non-overlapping groups that can be formed from a dynamic count:
+
+`result = floor(count / group_size)`
+
+Fields:
+
+- `count`: required `COUNT_SOURCE`.
+- `group_size`: required positive TOML integer greater than zero.
+
+Rules:
+
+1. `count` must produce a non-negative integer.
+2. Incomplete groups are ignored. No rounding up is permitted.
+3. The result is a non-negative integer.
+4. `count` cannot contain another `count_groups` or `scale`.
+5. `count_groups` does not select, partition, or modify objects. It calculates only a numeric group count.
+6. `count_groups` is permitted wherever a numeric Value is accepted.
+7. The underlying count retains all original reference, filter, and evaluation restrictions.
+
+Examples:
+
+- 0 objects, group size 2: result 0.
+- 1 object, group size 2: result 0.
+- 2 objects, group size 2: result 1.
+- 5 objects, group size 2: result 2.
+- 7 objects, group size 3: result 2.
+
+This is a restricted integer-grouping operation, not general division.
+
+### 13.2 Count-Scaled Values
+
+`scale` multiplies a supported dynamic count by a fixed positive integer:
+
+`result = count × multiplier`
+
+Fields:
+
+- `count`: required `COUNT_VALUE`.
+- `multiplier`: required positive TOML integer greater than zero.
+
 Restrictions:
 
 1. `count` must produce a non-negative integer.
-2. `multiplier` must be a positive TOML integer greater than zero.
+2. `multiplier` must be greater than zero.
 3. Nested `scale` expressions are forbidden.
 4. `literal`, `property`, and `sum_cost` are not valid `scale.count` sources.
-5. The resulting value is a non-negative integer.
-6. `scale` is permitted only where a numeric Value is accepted.
-7. All references and filters within `COUNT_VALUE` retain the rules and restrictions of their original Value forms.
+5. `count_groups` is a valid `scale.count` source.
+6. The resulting value is a non-negative integer.
+7. `scale` is permitted only where a numeric Value is accepted.
 8. Multiplication uses exact integer arithmetic. Implementations must not silently round, wrap, or saturate the result.
 
 `scale` represents one calculated numeric value. It does not repeat an operation, create a loop, or execute a separate instruction for each counted object.
 
-### 13.2 Evaluation
+### 13.3 Evaluation
 
 The underlying count is evaluated at the evaluation point established by the structure consuming the Value.
 
@@ -956,15 +998,15 @@ For resolution steps, conditions, and other one-time evaluations, use the evalua
 For continuous effects:
 
 - Evaluate the current count whenever the engine evaluates the continuous effect.
-- Recalculate the resulting value using the current game state.
+- Recalculate `count_groups` and `scale` using the current game state.
 - Do not snapshot the first calculated value when the effect activates, enters the Field, or is initially evaluated.
 - Changes to the counted objects must be reflected through the engine's normal continuous-effect evaluation and stabilization procedures.
 
-The engine remains responsible for continuous-effect timing, ordering, precedence, and stabilization under the Comprehensive Rules. `scale` does not introduce additional game events or evaluation checkpoints.
+The engine remains responsible for continuous-effect timing, ordering, precedence, and stabilization under the Comprehensive Rules. These Value forms do not introduce additional game events or evaluation checkpoints.
 
 If evaluation involves a circular dependency that cannot be resolved by applicable official rules, use `BLOCKED_NORMATIVE` rather than inventing an evaluation order.
 
-### 13.3 Existing Value Rules
+### 13.4 Existing Value Rules
 
 `don_count.scope` accepts only:
 
@@ -978,9 +1020,9 @@ If evaluation involves a circular dependency that cannot be resolved by applicab
 
 `count_area.area` is an AREA reference.
 
-The count sources accepted by `scale` retain their original evaluation and referential constraints.
+The count sources accepted by `count_groups` and `scale` retain their original evaluation and referential constraints.
 
-FCL permits only the explicitly defined `scale` multiplication. General arithmetic, addition expressions, subtraction expressions, division, arbitrary formulas, variables, functions, and arbitrary ID access remain unsupported.
+FCL permits only the explicitly defined `count_groups` and `scale` calculations. General arithmetic, arbitrary division, addition expressions, subtraction expressions, formulas, variables, functions, and arbitrary ID access remain unsupported.
 
 ## 14. References
 
@@ -1022,30 +1064,30 @@ Positions:
 
 References identify instances, players, areas, or earlier results.
 
-| `kind`                   | Additional fields | Meaning                                                         |
-| ------------------------ | ----------------- | --------------------------------------------------------------- |
-| `SOURCE`                 | None              | Instance containing the activated ability                       |
-| `EVENT_OBJECT`           | None              | Exact object involved in the current supported contextual event |
-| `PLAYER`                 | `role`            | Player reference                                                |
-| `AREA`                   | `player`, `name`  | Area belonging to a player                                      |
-| `SELECTED_OBJECT`        | `selection`       | Earlier singular selection                                      |
-| `SELECTED_SET`           | `selection`       | Earlier set-producing selection or REMAINDER                    |
-| `TEXT_DESIGNATED_OBJECT` | `designation`     | Single instance designated by text/rules                        |
-| `ATTACKER`               | None              | Attacker in battle context                                      |
-| `ATTACK_TARGET`          | None              | Target in battle context                                        |
-| `BATTLE`                 | None              | Engine battle context                                           |
-| `TOP_CARD`               | `player`, `area`  | Current top card of an area                                     |
-| `CANDIDATE`              | None              | Object under filter evaluation                                  |
+| `kind` | Additional fields | Meaning |
+|---|---|---|
+| `SOURCE` | None | Instance containing the activated ability |
+| `EVENT_OBJECT` | None | Exact object involved in the current supported contextual event |
+| `PLAYER` | `role` | Player reference |
+| `AREA` | `player`, `name` | Area belonging to a player |
+| `SELECTED_OBJECT` | `selection` | Earlier singular selection |
+| `SELECTED_SET` | `selection` | Earlier set-producing selection or REMAINDER |
+| `TEXT_DESIGNATED_OBJECT` | `designation` | Single instance designated by text/rules |
+| `ATTACKER` | None | Attacker in battle context |
+| `ATTACK_TARGET` | None | Target in battle context |
+| `BATTLE` | None | Engine battle context |
+| `TOP_CARD` | `player`, `area` | Current top card of an area |
+| `CANDIDATE` | None | Object under filter evaluation |
 
 `PLAYER`:
 
-```
+```toml
 { kind = "PLAYER", role = "YOU" }
 ```
 
 `AREA`:
 
-```
+```toml
 { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }
 ```
 
@@ -1100,15 +1142,15 @@ When returning selected cards to owner Hands, resolve each destination separatel
 
 Supported forms:
 
-```
+```toml
 { mode = "FIXED", value = { literal = 2 } }
 ```
 
-```
+```toml
 { mode = "UP_TO", maximum = { literal = 2 } }
 ```
 
-```
+```toml
 { mode = "DYNAMIC", value = { count_area = { area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "TRASH" } } } }
 ```
 
@@ -1170,16 +1212,16 @@ It does not perform selection, revelation, movement, or reordering.
 
 Fields:
 
-| Field       | Type   | Requirement                    |
-| ----------- | ------ | ------------------------------ |
-| `id`        | string | Required, unique within effect |
-| `kind`      | enum   | `REMAINDER`                    |
-| `look_step` | string | Earlier LOOK step              |
-| `excluding` | array  | Optional earlier SELECT IDs    |
+| Field | Type | Requirement |
+|---|---|---|
+| `id` | string | Required, unique within effect |
+| `kind` | enum | `REMAINDER` |
+| `look_step` | string | Earlier LOOK step |
+| `excluding` | array | Optional earlier SELECT IDs |
 
 Example:
 
-```
+```toml
 { id = "R1", kind = "REMAINDER", look_step = "S1", excluding = ["S2"] }
 ```
 
@@ -1213,7 +1255,7 @@ Every `REPLACEMENT` declaration requires `[abilities.effects.replacement]`.
 
 ### 16.1 Structure
 
-```
+```toml
 [[abilities.effects]]
 id = "E1"
 category = "REPLACEMENT"
@@ -1272,13 +1314,13 @@ The engine retains the originating card, ability, effect, and source owner.
 
 Compatibility:
 
-| Target procedure            | Permitted replaced part                       |
-| --------------------------- | --------------------------------------------- |
-| `ACTIVATION_COST_PAYMENT`   | `ACTIVATION_COST_PAYMENT`                     |
-| `LEADER_DAMAGE_PROCESSING`  | `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE` |
-| `CHARACTER_KO_PROCESSING`   | `CHARACTER_KO`                                |
-| `EFFECT_REMOVAL_FROM_FIELD` | `FIELD_REMOVAL_BY_EFFECT`                     |
-| `ORDINARY_CARD_MOVEMENT`    | `ORDINARY_CARD_MOVEMENT`                      |
+| Target procedure | Permitted replaced part |
+|---|---|
+| `ACTIVATION_COST_PAYMENT` | `ACTIVATION_COST_PAYMENT` |
+| `LEADER_DAMAGE_PROCESSING` | `LEADER_DAMAGE`, `LIFE_TO_HAND_DURING_DAMAGE` |
+| `CHARACTER_KO_PROCESSING` | `CHARACTER_KO` |
+| `EFFECT_REMOVAL_FROM_FIELD` | `FIELD_REMOVAL_BY_EFFECT` |
+| `ORDINARY_CARD_MOVEMENT` | `ORDINARY_CARD_MOVEMENT` |
 
 These values are not interchangeable.
 
@@ -1360,15 +1402,15 @@ An accepted `UP_TO` payment may still permit a zero quantity when text/CR allows
 
 ### 17.2 Payment Catalog
 
-| `kind`                           | Required fields                                  | Semantics                                                                           |
-| -------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `REST_DON`                       | `payer`, `selection`                             | Select and rest specified active DON!! in payer's Cost Area                         |
-| `DON_MINUS`                      | `payer`, `selection`                             | Return specified DON!! from payer's Leader, Character, and Cost Areas to DON!! Deck |
-| `REST_CARD`                      | `payer`, exactly one of `selection` or `subject` | Rest selected card(s) or exact SOURCE                                               |
-| `TRASH_HAND_CARD`                | `payer`, `selection`                             | Trash one selected card from payer's Hand                                           |
-| `RETURN_CHARACTER_TO_OWNER_HAND` | `payer`, `selection`                             | Return one selected Character from payer's Character Area to its owner's Hand       |
-| `ADD_LIFE_TO_HAND`               | `payer`, `quantity`                              | Move top Life card(s) to payer's Hand                                               |
-| `PLACE_HAND_CARD_BOTTOM_DECK`    | `payer`, `selection`                             | Place one selected Hand card at bottom of payer's Deck                              |
+| `kind` | Required fields | Semantics |
+|---|---|---|
+| `REST_DON` | `payer`, `selection` | Select and rest specified active DON!! in payer's Cost Area |
+| `DON_MINUS` | `payer`, `selection` | Return specified DON!! from payer's Leader, Character, and Cost Areas to DON!! Deck |
+| `REST_CARD` | `payer`, exactly one of `selection` or `subject` | Rest selected card(s) or exact SOURCE |
+| `TRASH_HAND_CARD` | `payer`, `selection` | Trash one selected card from payer's Hand |
+| `RETURN_CHARACTER_TO_OWNER_HAND` | `payer`, `selection` | Return one selected Character from payer's Character Area to its owner's Hand |
+| `ADD_LIFE_TO_HAND` | `payer`, `quantity` | Move top Life card(s) to payer's Hand |
+| `PLACE_HAND_CARD_BOTTOM_DECK` | `payer`, `selection` | Place one selected Hand card at bottom of payer's Deck |
 
 All payment types may also contain `optional`.
 
@@ -1385,17 +1427,17 @@ Payment-selection fields:
 
 Specific requirements:
 
-REST_DON
+**REST_DON**
 
 - Areas contain only payer's Cost Area.
 - `object = "DON"`.
 - Filter restricts `STATE = ACTIVE`.
 
-DON_MINUS
+**DON_MINUS**
 
-\- Areas identify the payer's permitted Leader, Character, and Cost Areas.
+- Areas identify the payer's permitted Leader, Character, and Cost Areas.
 
-REST_CARD using selection
+**REST_CARD using selection**
 
 - `object = "CARD"`.
 - Filter restricts `STATE = ACTIVE`.
@@ -1404,17 +1446,17 @@ REST_CARD using selection
 - `UP_TO` and `DYNAMIC` are not supported for this payment-selection form.
 - Selected objects must be distinct eligible card instances.
 
-REST_CARD using subject
+**REST_CARD using subject**
 
 - Uses only the direct SOURCE form in §17.7.
 - It cannot be combined with `selection`.
 
-TRASH_HAND_CARD
+**TRASH_HAND_CARD**
 
 - Area must be payer's Hand.
 - Quantity must be `FIXED 1`.
 
-RETURN_CHARACTER_TO_OWNER_HAND
+**RETURN_CHARACTER_TO_OWNER_HAND**
 
 - Area must be only payer's Character Area.
 - Object must be `CARD`.
@@ -1423,7 +1465,7 @@ RETURN_CHARACTER_TO_OWNER_HAND
 - Information must be `PUBLIC_INFORMATION`.
 - Filter must restrict `CATEGORY = CHARACTER`.
 
-PLACE_HAND_CARD_BOTTOM_DECK
+**PLACE_HAND_CARD_BOTTOM_DECK**
 
 - Area must be payer's Hand.
 - Object must be `CARD`.
@@ -1439,7 +1481,7 @@ Version 1.5.0 extends `REST_CARD.selection` to allow a fixed quantity greater th
 
 Example:
 
-```
+```toml
 {
   kind = "REST_CARD",
   payer = { kind = "PLAYER", role = "YOU" },
@@ -1504,7 +1546,7 @@ Use `UP_TO` when the text permits up to a quantity.
 
 Example:
 
-```
+```toml
 { kind = "ADD_LIFE_TO_HAND", payer = { kind = "PLAYER", role = "YOU" }, quantity = { mode = "UP_TO", maximum = { literal = 1 } }, optional = true }
 ```
 
@@ -1518,7 +1560,7 @@ It uses a payment-selection table with exactly one CARD from HAND, payer as choo
 
 Example:
 
-```
+```toml
 { kind = "PLACE_HAND_CARD_BOTTOM_DECK", payer = { kind = "PLAYER", role = "YOU" }, selection = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "HAND" }], quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "OWNER_PRIVATE_INFORMATION" }, optional = true }
 ```
 
@@ -1547,7 +1589,7 @@ Its payment selection must contain:
 
 Example:
 
-```
+```toml
 { kind = "RETURN_CHARACTER_TO_OWNER_HAND", payer = { kind = "PLAYER", role = "YOU" }, selection = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "CHARACTER_AREA" }], filter = { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } }, quantity = { mode = "FIXED", value = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "PUBLIC_INFORMATION" }, optional = true }
 ```
 
@@ -1567,7 +1609,7 @@ The returned card can be used by subsequent resolution only if it actually belon
 
 The direct form is:
 
-```
+```toml
 { kind = "REST_CARD", payer = { kind = "PLAYER", role = "YOU" }, subject = { kind = "SOURCE" } }
 ```
 
@@ -1608,18 +1650,18 @@ If SOURCE cannot be rested, payment cannot be made.
 
 `resolution` is an ordered array. Every step has a unique `id` within the effect, including nested branches, and a `kind`.
 
-| Kind           | Required fields besides `id` and `kind`                 | Optional fields                               |
-| -------------- | ------------------------------------------------------- | --------------------------------------------- |
-| `SELECT`       | `object`, `areas`, `quantity`, `chooser`, `information` | `filter`, `information_step`, `order_chooser` |
-| `REMAINDER`    | `look_step`                                             | `excluding`                                   |
-| `OPERATION`    | `operation` and §19 required parameters                 | §19 optional parameters                       |
-| `IF`           | `condition`, `steps`                                    | None                                          |
-| `THEN`         | `steps`                                                 | None                                          |
-| `IF_YOU_DO`    | `depends_on`, `steps`                                   | None                                          |
-| `OPTIONAL`     | `chooser`, `steps`                                      | None                                          |
-| `CHOOSE_MODE`  | `chooser`, `options`                                    | None                                          |
-| `SIMULTANEOUS` | `steps`                                                 | None                                          |
-| `REPEAT`       | `quantity`, `steps`                                     | None                                          |
+| Kind | Required fields besides `id` and `kind` | Optional fields |
+|---|---|---|
+| `SELECT` | `object`, `areas`, `quantity`, `chooser`, `information` | `filter`, `information_step`, `order_chooser` |
+| `REMAINDER` | `look_step` | `excluding` |
+| `OPERATION` | `operation` and §19 required parameters | §19 optional parameters |
+| `IF` | `condition`, `steps` | None |
+| `THEN` | `steps` | None |
+| `IF_YOU_DO` | `depends_on`, `steps` | None |
+| `OPTIONAL` | `chooser`, `steps` | None |
+| `CHOOSE_MODE` | `chooser`, `options` | None |
+| `SIMULTANEOUS` | `steps` | None |
+| `REPEAT` | `quantity`, `steps` | None |
 
 `SELECT` follows §15.2. `REMAINDER` follows §15.3.
 
@@ -1683,35 +1725,36 @@ The engine handles generated events, Trigger, `rule processing`, and general loo
 
 Only the following identifiers are permitted.
 
-| Operation               | Semantics                                                                               |
-| ----------------------- | --------------------------------------------------------------------------------------- |
-| `DRAW`                  | Draw from Deck using official procedure; `UP_TO` permits stopping before each draw      |
-| `TRASH_HAND`            | Move selected Hand card to Trash; not K.O.                                              |
-| `TRASH_DECK`            | Trash selected Deck card under authorized selection/information rules; not draw         |
-| `KO_CHARACTER`          | Apply official Character K.O. procedure and event                                       |
-| `MOVE_CARD`             | Ordinary area movement, not K.O., damage, draw, Trigger, playing, or DON!! −X           |
-| `REST`                  | Active to rested; already rested remains rested                                         |
-| `SET_ACTIVE`            | Rested to active; already active remains active                                         |
-| `GIVE_DON`              | Attach DON!! from Cost Area to eligible Leader/Character                                |
-| `ADD_DON`               | Move DON!! from DON!! Deck into Cost Area with specified state                          |
-| `DON_MINUS`             | Official DON!! −X procedure                                                             |
-| `PLAY_CARD`             | Official procedure for playing by effect; not ordinary Field movement                   |
-| `REVEAL`                | Reveal subject/selection/LOOK result without moving it                                  |
-| `LOOK`                  | Inspect top cards of an ordered area without movement, revelation to others, or reorder |
-| `SHUFFLE_DECK`          | Official Deck shuffle                                                                   |
-| `MODIFY_POWER`          | Modify effective Power, not base Power                                                  |
-| `SET_BASE_POWER`        | Set base Power under normative precedence                                               |
-| `MODIFY_COST`           | Modify effective Cost                                                                   |
-| `SET_BASE_COST`         | Set base Cost                                                                           |
-| `MODIFY_CHARACTERISTIC` | Modify/grant only NAME, TYPE, or ATTRIBUTE                                              |
-| `GRANT_KEYWORD_EFFECT`  | Grant recognized Keyword Effect/Keyword with duration                                   |
-| `DEAL_LEADER_DAMAGE`    | Official Leader damage procedure, including Life, Trigger, replacements, and defeat     |
-| `MOVE_LIFE_CARD`        | Ordinary Life movement, not damage and no Trigger by itself                             |
-| `POSITION_CARD`         | Position a card/set at an authorized stack position                                     |
-| `RETURN_CARD`           | Return to Hand, Deck, or Trash, preserving owner/destination                            |
-| `END_GAME`              | Grant victory/defeat only when text/rules authorize it                                  |
+| Operation | Semantics |
+|---|---|
+| `DRAW` | Draw from Deck using official procedure; `UP_TO` permits stopping before each draw |
+| `TRASH_HAND` | Move selected Hand card to Trash; not K.O. |
+| `TRASH_DECK` | Trash selected Deck card under authorized selection/information rules; not draw |
+| `KO_CHARACTER` | Apply official Character K.O. procedure and event |
+| `MOVE_CARD` | Ordinary area movement, not K.O., damage, draw, Trigger, playing, or DON!! −X |
+| `REST` | Active to rested; already rested remains rested |
+| `SET_ACTIVE` | Rested to active; already active remains active |
+| `GIVE_DON` | Attach DON!! from Cost Area to eligible Leader/Character |
+| `ADD_DON` | Move DON!! from DON!! Deck into Cost Area with specified state |
+| `DON_MINUS` | Official DON!! −X procedure |
+| `PLAY_CARD` | Official procedure for playing by effect; not ordinary Field movement |
+| `REVEAL` | Reveal subject/selection/LOOK result without moving it |
+| `LOOK` | Inspect top cards of an ordered area without movement, revelation to others, or reorder |
+| `SHUFFLE_DECK` | Official Deck shuffle |
+| `MODIFY_POWER` | Modify effective Power, not base Power |
+| `SET_BASE_POWER` | Set base Power under normative precedence |
+| `MODIFY_COST` | Modify effective Cost |
+| `SET_BASE_COST` | Set base Cost |
+| `MODIFY_CHARACTERISTIC` | Modify/grant only NAME, TYPE, or ATTRIBUTE |
+| `GRANT_KEYWORD_EFFECT` | Grant recognized Keyword Effect/Keyword with duration |
+| `DEAL_LEADER_DAMAGE` | Official Leader damage procedure, including Life, Trigger, replacements, and defeat |
+| `MOVE_LIFE_CARD` | Ordinary Life movement, not damage and no Trigger by itself |
+| `POSITION_CARD` | Position a card/set at an authorized stack position |
+| `RETURN_CARD` | Return to Hand, Deck, or Trash, preserving owner/destination |
+| `END_GAME` | Grant victory/defeat only when text/rules authorize it |
+| `PREVENT_ATTACK` | Prevent specified Leader/Character instances from declaring attacks for the specified duration |
 
-Attack-target permission, attack-target restriction, and battle K.O. prevention are continuous consequences, not resolution operations.
+Attack-target permission, attack-target restriction, and battle K.O. prevention are continuous consequences, not resolution operations. `PREVENT_ATTACK` is separately available as a resolution operation and as a continuous-effect kind under §20.
 
 ### 19.1 Operation Parameters
 
@@ -1723,32 +1766,33 @@ Where the matrix says `subject` or `selection`, exactly one must appear.
 
 Area, player, quantity, and duration use their defined structures. No additional fields are permitted.
 
-| Operation               | Required fields                                                       | Optional fields                              |
-| ----------------------- | --------------------------------------------------------------------- | -------------------------------------------- |
-| `DRAW`                  | `player`, `quantity`                                                  | None                                         |
-| `TRASH_HAND`            | `player`, `selection`                                                 | None                                         |
-| `TRASH_DECK`            | `player`, `selection`                                                 | None                                         |
-| `KO_CHARACTER`          | `subject` or `selection`                                              | None                                         |
-| `MOVE_CARD`             | `subject` or `selection`, `source_area`, `destination_area`           | `face`, `state`, `position`, `order_chooser` |
-| `REST` / `SET_ACTIVE`   | `subject` or `selection`                                              | None                                         |
-| `GIVE_DON`              | recipient `subject` or `selection`, `quantity`, `source_state`        | None                                         |
-| `ADD_DON`               | `player`, `quantity`, `arrival_state`                                 | None                                         |
-| `DON_MINUS`             | `player`, `quantity`                                                  | None                                         |
-| `PLAY_CARD`             | card `subject` or `selection`, `source_area`, `player`                | `state`                                      |
-| `REVEAL`                | Exactly one of `subject`, `selection`, `look_step`                    | `recipients`                                 |
-| `LOOK`                  | `area`, `player`, `quantity`                                          | None                                         |
-| `SHUFFLE_DECK`          | `player`                                                              | None                                         |
-| `MODIFY_POWER`          | `subject` or `selection`, `operator`, `value`, `duration`             | None                                         |
-| `SET_BASE_POWER`        | `subject` or `selection`, `value`, `duration`                         | None                                         |
-| `MODIFY_COST`           | `subject` or `selection`, `operator`, `value`, `duration`             | None                                         |
-| `SET_BASE_COST`         | `subject` or `selection`, `value`, `duration`                         | None                                         |
-| `MODIFY_CHARACTERISTIC` | `subject` or `selection`, `property`, `operator`, `value`, `duration` | None                                         |
-| `GRANT_KEYWORD_EFFECT`  | `subject` or `selection`, `keyword_effect`, `duration`                | None                                         |
-| `DEAL_LEADER_DAMAGE`    | `player`, `quantity`                                                  | None                                         |
-| `MOVE_LIFE_CARD`        | `subject` or `selection`, `source_area`, `destination_area`           | `position`, `face`, `order_chooser`          |
-| `POSITION_CARD`         | `subject` or `selection`, `destination_area`, `position`              | `order_chooser`                              |
-| `RETURN_CARD`           | `subject` or `selection`, `destination_area`                          | `position`                                   |
-| `END_GAME`              | `player`, `outcome` (`WIN` or `LOSE`)                                 | None                                         |
+| Operation | Required fields | Optional fields |
+|---|---|---|
+| `DRAW` | `player`, `quantity` | None |
+| `TRASH_HAND` | `player`, `selection` | None |
+| `TRASH_DECK` | `player`, `selection` | None |
+| `KO_CHARACTER` | `subject` or `selection` | None |
+| `MOVE_CARD` | `subject` or `selection`, `source_area`, `destination_area` | `face`, `state`, `position`, `order_chooser` |
+| `REST` / `SET_ACTIVE` | `subject` or `selection` | None |
+| `GIVE_DON` | recipient `subject` or `selection`, `quantity`, `source_state` | None |
+| `ADD_DON` | `player`, `quantity`, `arrival_state` | None |
+| `DON_MINUS` | `player`, `quantity` | None |
+| `PLAY_CARD` | card `subject` or `selection`, `source_area`, `player` | `state` |
+| `REVEAL` | Exactly one of `subject`, `selection`, `look_step` | `recipients` |
+| `LOOK` | `area`, `player`, `quantity` | None |
+| `SHUFFLE_DECK` | `player` | None |
+| `MODIFY_POWER` | `subject` or `selection`, `operator`, `value`, `duration` | None |
+| `SET_BASE_POWER` | `subject` or `selection`, `value`, `duration` | None |
+| `MODIFY_COST` | `subject` or `selection`, `operator`, `value`, `duration` | None |
+| `SET_BASE_COST` | `subject` or `selection`, `value`, `duration` | None |
+| `MODIFY_CHARACTERISTIC` | `subject` or `selection`, `property`, `operator`, `value`, `duration` | None |
+| `GRANT_KEYWORD_EFFECT` | `subject` or `selection`, `keyword_effect`, `duration` | None |
+| `DEAL_LEADER_DAMAGE` | `player`, `quantity` | None |
+| `MOVE_LIFE_CARD` | `subject` or `selection`, `source_area`, `destination_area` | `position`, `face`, `order_chooser` |
+| `POSITION_CARD` | `subject` or `selection`, `destination_area`, `position` | `order_chooser` |
+| `RETURN_CARD` | `subject` or `selection`, `destination_area` | `position` |
+| `END_GAME` | `player`, `outcome` (`WIN` or `LOSE`) | None |
+| `PREVENT_ATTACK` | Exactly one of `subject` or `selection`, `duration` | None |
 
 `source_area`, `destination_area`, and `area` are AREA_REF, except `AREA_COUNT.area`, which uses an area name.
 
@@ -1810,8 +1854,43 @@ When a selected card moves to an area whose player is `OWNER`, resolve the desti
 - Positioning a remainder set preserves group ordering.
 - `GRANT_ATTACK_TARGET_PERMISSION` only adds its explicitly specified targets.
 - `RESTRICT_ATTACK_TARGETS` only narrows the legal target set for the specified player's attacks.
+- `PREVENT_ATTACK` prevents the affected instance from declaring attacks; it does not restrict which targets another attacker may choose.
 - `PREVENT_BATTLE_KO` only prevents the specified battle K.O. result.
-- None of these continuous constructs is interchangeable with another.
+- None of these constructs is interchangeable with another.
+
+### 19.3 PREVENT_ATTACK
+
+`PREVENT_ATTACK` applies a temporary restriction preventing the specified card instance(s) from declaring attacks.
+
+Required fields:
+
+- Exactly one of `subject` or `selection`.
+- `duration`, following §21.
+
+Requirements:
+
+1. `subject` must identify a singular Leader or Character instance.
+2. `selection` must reference an earlier compatible `SELECT` result containing card instances.
+3. Each affected instance must be a Leader in `LEADER_AREA` or a Character in `CHARACTER_AREA` when the operation is processed.
+4. Both ACTIVE and RESTED instances may be affected.
+5. An empty selection affects no objects.
+6. No substitute object may be chosen.
+7. The restriction applies to the exact selected instance(s), not to every card sharing their name or characteristics.
+8. The restriction remains effective for its declared duration even if the source of the effect leaves the Field.
+9. If an affected instance leaves its Field area, a new instance created upon its subsequent return is not affected by the original restriction.
+10. Multiple restrictions apply independently. An instance cannot declare an attack while any applicable `PREVENT_ATTACK` restriction remains active.
+
+This operation:
+
+- Prevents the affected instance from being declared as an attacker.
+- Does not change its ACTIVE or RESTED state.
+- Does not prevent it from being selected as an attack target.
+- Does not prevent unrelated actions or abilities.
+- Does not negate Rush, Blocker, or other Keyword Effects.
+- Does not cancel an attack that was already declared before the restriction was applied.
+- Does not redirect or modify a battle.
+
+`PREVENT_ATTACK` is a narrowly defined attack-declaration restriction, not generic action prohibition.
 
 ## 20. Continuous Effects — `continuous`
 
@@ -1823,19 +1902,20 @@ Both are inside `continuous`, never sibling fields of the effect.
 
 Permitted kinds:
 
-| Kind                                             | Required additional fields                                | Optional fields      |
-| ------------------------------------------------ | --------------------------------------------------------- | -------------------- |
-| `MODIFY_POWER` / `MODIFY_COST`                   | `operator`, `value`, Auto/Activate `duration`             | None                 |
-| `SET_BASE_POWER` / `SET_BASE_COST`               | `value`, Auto/Activate `duration`                         | None                 |
-| `MODIFY_CHARACTERISTIC`                          | `property`, `operator`, `value`, Auto/Activate `duration` | None                 |
-| `GRANT_KEYWORD_EFFECT` / `REMOVE_KEYWORD_EFFECT` | `keyword_effect`, Auto/Activate `duration`                | None                 |
-| `GRANT_ATTACK_TARGET_PERMISSION`                 | `target_scope`, Auto/Activate `duration`                  | None                 |
-| `RESTRICT_ATTACK_TARGETS`                        | `attacking_player`, `allowed_targets`                     | None                 |
-| `PREVENT_BATTLE_KO`                              | Auto/Activate `duration`                                  | `attacker_condition` |
+| Kind | Required additional fields | Optional fields |
+|---|---|---|
+| `MODIFY_POWER` / `MODIFY_COST` | `operator`, `value`, Auto/Activate `duration` | None |
+| `SET_BASE_POWER` / `SET_BASE_COST` | `value`, Auto/Activate `duration` | None |
+| `MODIFY_CHARACTERISTIC` | `property`, `operator`, `value`, Auto/Activate `duration` | None |
+| `GRANT_KEYWORD_EFFECT` / `REMOVE_KEYWORD_EFFECT` | `keyword_effect`, Auto/Activate `duration` | None |
+| `GRANT_ATTACK_TARGET_PERMISSION` | `target_scope`, Auto/Activate `duration` | None |
+| `RESTRICT_ATTACK_TARGETS` | `attacking_player`, `allowed_targets` | None |
+| `PREVENT_ATTACK` | Auto/Activate `duration` | None |
+| `PREVENT_BATTLE_KO` | Auto/Activate `duration` | `attacker_condition` |
 
 `scope`:
 
-```
+```toml
 { object = "CARD", areas = [AREA_REF], player = PLAYER_REF, filter = CONDITION }
 ```
 
@@ -1867,7 +1947,7 @@ It is permission, not an attack instruction.
 
 Example:
 
-```
+```toml
 [abilities.effects.continuous]
 kind = "GRANT_ATTACK_TARGET_PERMISSION"
 subject = { kind = "SOURCE" }
@@ -1880,12 +1960,12 @@ target_scope = {
 
 `target_scope` is an inline table:
 
-| Field    | Type              | Requirement                                                |
-| -------- | ----------------- | ---------------------------------------------------------- |
-| `object` | enum              | Required; only `CARD`                                      |
-| `areas`  | array of AREA_REF | Required, non-empty                                        |
-| `states` | array             | Optional; non-empty when present; `ACTIVE` and/or `RESTED` |
-| `filter` | Condition         | Optional; uses `CANDIDATE`                                 |
+| Field | Type | Requirement |
+|---|---|---|
+| `object` | enum | Required; only `CARD` |
+| `areas` | array of AREA_REF | Required, non-empty |
+| `states` | array | Optional; non-empty when present; `ACTIVE` and/or `RESTED` |
+| `filter` | Condition | Optional; uses `CANDIDATE` |
 
 Areas identify where additional targets can be found.
 
@@ -1919,7 +1999,7 @@ Prevents K.O. caused by a battle result for `continuous.subject` or the cards wi
 
 Example:
 
-```
+```toml
 [abilities.effects.continuous]
 kind = "PREVENT_BATTLE_KO"
 subject = { kind = "SOURCE" }
@@ -1976,7 +2056,7 @@ Required structure:
 
 Example:
 
-```
+```toml
 [abilities.effects.continuous]
 kind = "RESTRICT_ATTACK_TARGETS"
 subject = { kind = "SOURCE" }
@@ -1996,12 +2076,12 @@ allowed_targets = {
 
 `allowed_targets` accepts:
 
-| Field    | Type              | Requirement                                   |
-| -------- | ----------------- | --------------------------------------------- |
-| `object` | enum              | Required; only `CARD`                         |
-| `areas`  | array of AREA_REF | Required; non-empty                           |
-| `states` | array of enums    | Optional; non-empty; `ACTIVE` and/or `RESTED` |
-| `filter` | Condition         | Optional; uses `CANDIDATE`                    |
+| Field | Type | Requirement |
+|---|---|---|
+| `object` | enum | Required; only `CARD` |
+| `areas` | array of AREA_REF | Required; non-empty |
+| `states` | array of enums | Optional; non-empty; `ACTIVE` and/or `RESTED` |
+| `filter` | Condition | Optional; uses `CANDIDATE` |
 
 Semantics:
 
@@ -2040,7 +2120,44 @@ The official OP11-010 FAQ confirms that an independent effect granting attacks a
 
 The restriction applies only to target eligibility at the applicable declaration point. All other attack and battle procedures remain under the CR.
 
-### 20.4 Continuous-Effect Structure and Boundaries
+### 20.4 PREVENT_ATTACK
+
+`PREVENT_ATTACK` is a narrowly defined continuous restriction preventing affected card instance(s) from declaring attacks.
+
+It is distinct from `RESTRICT_ATTACK_TARGETS`:
+
+- `PREVENT_ATTACK` restricts the affected card as an attacker.
+- `RESTRICT_ATTACK_TARGETS` restricts the targets available to a specified player's attacks.
+
+It is also distinct from `PREVENT_BATTLE_KO`.
+
+For this kind:
+
+- `subject` identifies one affected card instance.
+- `scope` identifies affected card instances through the normal continuous scope structure.
+- Exactly one of `subject` or `scope` is required.
+- Affected objects must be Leader or Character card instances in their respective Field areas.
+- `scope.areas` may contain only `LEADER_AREA` and/or `CHARACTER_AREA`.
+- `scope.filter`, when present, uses `CANDIDATE`.
+
+The restriction prevents the affected objects from being declared as attackers while the continuous effect remains valid.
+
+For `PERMANENT`, validity follows the effect's `valid_when` and official rules.
+
+For `AUTO` and `ACTIVATE`, `duration` is mandatory.
+
+It does not:
+
+- Change card state.
+- Prevent the affected card from being attacked.
+- Cancel attacks already declared.
+- Prevent unrelated actions or abilities.
+- Modify target eligibility.
+- Redirect attacks or change battle resolution.
+
+`PREVENT_ATTACK` is not a generic `PROHIBIT_ACTION` mechanism.
+
+### 20.5 Continuous-Effect Structure and Boundaries
 
 For ordinary continuous effects, exactly one of `subject` or `scope` is required.
 
@@ -2065,7 +2182,7 @@ The following are outside the profile:
 
 Use `BLOCKED_CAPABILITY` when the actual text requires these unrestricted capabilities.
 
-The three supported target/battle constructs are narrowly defined exceptions and cannot be repurposed outside their contracts.
+The four supported attack/battle constructs are narrowly defined exceptions and cannot be repurposed outside their contracts.
 
 Replacement Effects remain exclusively `category = "REPLACEMENT"`.
 
@@ -2080,10 +2197,30 @@ Permitted kinds:
 - `UNTIL_END_OF_END_PHASE`
 - `THIS_BATTLE`
 - `UNTIL_START_OF_NEXT_TURN`, with `player`
+- `UNTIL_END_OF_NEXT_TURN`, with `player`
 - `WHILE_VALID`, with `condition`
 - `PERMANENT`, only when text/rules establish that duration without ordinary temporal expiration
 
 Do not normalize `THIS_TURN` and `UNTIL_END_OF_TURN`.
+
+`UNTIL_END_OF_NEXT_TURN` identifies the first end-of-turn expiration checkpoint belonging to the specified player that occurs after the duration is created.
+
+Fields:
+
+- `player`: required PLAYER reference.
+
+Rules:
+
+1. Resolve the PLAYER reference when the duration is created and retain that exact player identity.
+2. If the specified player's turn is already in progress and its end-of-turn expiration checkpoint has not yet occurred, that turn qualifies.
+3. Otherwise, the next turn of that player qualifies.
+4. The duration expires at that turn's official end-of-turn expiration checkpoint, after applicable End Phase processing.
+5. The player reference is not dynamically re-resolved when the Turn Player changes.
+6. This duration is distinct from `UNTIL_END_OF_TURN` and `UNTIL_START_OF_NEXT_TURN`.
+
+For OP01-085, when its On Play effect resolves during the opponent's turn, that current opponent turn is the qualifying turn, as confirmed by the official OP01-085 FAQ.
+
+The engine performs expiration at the corresponding official checkpoint. FCL does not introduce a separate end-of-turn event.
 
 Expiration occurs at official engine checkpoints.
 
@@ -2099,7 +2236,7 @@ The engine performs Permanent Effect stabilization in Turn Player, then Non-Turn
 
 `usage_limit` accepts only:
 
-```
+```toml
 usage_limit = { kind = "ONCE_PER_TURN" }
 ```
 
@@ -2144,6 +2281,11 @@ Validate:
 - Valid `GRANT_ATTACK_TARGET_PERMISSION.target_scope`.
 - Valid `RESTRICT_ATTACK_TARGETS` structure, including SOURCE, attacking player, and allowed target class.
 - Valid `PREVENT_BATTLE_KO.attacker_condition`.
+- Valid `PREVENT_ATTACK` operation structure, with exactly one of `subject` or `selection` and a supported duration.
+- `PREVENT_ATTACK.selection` references an earlier compatible `SELECT` result, never a `REMAINDER`.
+- `PREVENT_ATTACK` targets only Leader/Character instances in their corresponding Field areas.
+- Valid `PREVENT_ATTACK` continuous-effect structure, including its subject/scope restrictions.
+- `PREVENT_ATTACK` continuous scope uses only `LEADER_AREA` and/or `CHARACTER_AREA`.
 - Kind-specific fields forbidden from other continuous-effect types.
 - Exactly one `REST_CARD` form: `selection` or `subject`.
 - `REST_CARD.subject` exactly SOURCE.
@@ -2157,6 +2299,11 @@ Validate:
 - `ON_OPPONENT_CHARACTER_KO` is accepted only as an `AUTO` timing.
 - `EVENT_OBJECT` is used only in its authorized event context.
 - `EVENT_OBJECT` is not used as an unrestricted instance identifier or global variable.
+- Valid `count_groups` structure, including its direct count source and positive `group_size`.
+- Valid `scale` structure, including `count_groups` as an authorized count source.
+- No nested `count_groups` or `scale` expressions.
+- `UNTIL_END_OF_NEXT_TURN` requires exactly one `player` PLAYER reference.
+- No additional fields in `count_groups`, `scale`, `PREVENT_ATTACK`, or the new duration form.
 
 For `REST_CARD.selection`, validators must enforce the exact version rules:
 
@@ -2184,6 +2331,11 @@ Validate:
 - Attack restrictions contain no arbitrary instance-ID access.
 - `EVENT_OBJECT` points to the exact Character associated with the corresponding `ON_OPPONENT_CHARACTER_KO` occurrence.
 - `EVENT_OBJECT` cannot reference an unrelated event, card, or effect.
+- References nested inside `count_groups` and `scale` resolve using the original count-source rules.
+- `PREVENT_ATTACK.subject` identifies an authorized singular card instance.
+- `PREVENT_ATTACK.selection` identifies a compatible earlier SELECT result in the same effect.
+- `PREVENT_ATTACK` references preserve the identity of every affected instance.
+- `UNTIL_END_OF_NEXT_TURN.player` resolves to a player identity when the duration is created.
 - No global or implicit selection reference exists.
 
 ### 23.4 Semantic
@@ -2233,8 +2385,20 @@ Validate:
 - `RESTRICT_ATTACK_TARGETS` only narrows the target set of the specified attacking player.
 - Attack restrictions combine cumulatively and are not overridden by added attack permissions.
 - Restrictions do not cancel already declared attacks.
+- `PREVENT_ATTACK` prevents the affected instance from declaring attacks, not from being attacked.
+- `PREVENT_ATTACK` does not cancel previously declared attacks or modify battle resolution.
+- `PREVENT_ATTACK` is distinct from `RESTRICT_ATTACK_TARGETS` and `PREVENT_BATTLE_KO`.
+- A new instance created after an affected card leaves and returns to the Field does not inherit the original restriction.
+- Multiple active `PREVENT_ATTACK` restrictions apply independently.
 - `PREVENT_BATTLE_KO` only prevents the specified battle K.O.
 - `ATTACKER` uses correct battle context and effective characteristics.
+- `count_groups` uses integer floor division; incomplete groups are ignored.
+- `count_groups` and `scale` use the evaluation point established by their consuming construct.
+- Continuous count-based values are recalculated using the current game state.
+- `TYPE` with `EQ` tests membership in the subject's effective types, including multi-type cards.
+- `UNTIL_END_OF_NEXT_TURN` expires at the first qualifying end-of-turn checkpoint of its retained player identity.
+- When that player's turn is already in progress and its expiration checkpoint has not occurred, the current turn qualifies.
+- The OP01-085 FAQ interpretation is preserved: if the effect resolves during the opponent's turn, the restriction expires at the end of that same turn.
 - No unsupported semantics are approximated.
 
 ### 23.5 Normative
@@ -2251,6 +2415,8 @@ Validate:
 - Complete gameplay text must be accounted for.
 - Official names and type boundaries must not be inferred from provider suffixes, concatenation, internal identifiers, or artwork labels.
 - The OP01-061 event-time requirement must follow the applicable official FAQ and cannot be replaced by a generic delayed-condition evaluation.
+- The OP01-085 FAQ may establish the specific current-opponent-turn interpretation of its duration, but must not be generalized beyond its ruling.
+- A `SUPPORTED` translation using the OP01-085 timing interpretation must preserve the applicable official FAQ reference.
 
 ## 24. Blocking Policy
 
@@ -2272,6 +2438,8 @@ The translator must block when the text and applicable official sources do not e
 - Additional attack-target class.
 - Restricted attack-target class.
 - Protected object or qualifying battle attacker.
+- Attack-declaration prevention outside the defined `PREVENT_ATTACK` contract.
+- Count grouping or arithmetic beyond the explicitly defined `count_groups` and `scale` forms.
 
 ### 24.1 Blocker Meanings
 
@@ -2300,6 +2468,11 @@ Do not use `BLOCKED_CAPABILITY` when the behavior is already expressible through
 - `GRANT_ATTACK_TARGET_PERMISSION`.
 - `RESTRICT_ATTACK_TARGETS`.
 - `PREVENT_BATTLE_KO`.
+- `count_groups` combined with `scale`.
+- `PREVENT_ATTACK` as a resolution operation.
+- `PREVENT_ATTACK` as a continuous-effect kind.
+- `UNTIL_END_OF_NEXT_TURN`.
+- `TYPE` membership comparisons using `PROPERTY_COMPARE` with `EQ`.
 
 Do not block merely because an ability involves battle, attacks, target restrictions, attacker characteristics, K.O., or continuous protection. Inspect the actual constructs first.
 
@@ -2309,13 +2482,86 @@ Never convert a blocker into an empty operation, default value, approximated bra
 
 Never invent an enumeration, opcode, property, player, or exception.
 
+## 25. Versioning and Compatibility
+
+`language_version` identifies structure, catalog, and semantics.
+
+Compatible versions:
+
+- 1.1.0 extends 1.0.0.
+- 1.2.0 extends 1.1.0.
+- 1.3.0 extends 1.2.0.
+- 1.4.0 extends 1.3.0.
+- 1.5.0 extends 1.4.0.
+- 1.6.0 extends 1.5.0.
+- 1.7.0 extends 1.6.0.
+- 1.8.0 extends 1.7.0.
+
+Previous meanings remain unchanged.
+
+Requirements:
+
+- Documents using only 1.0.0 constructs may remain at 1.0.0.
+- Documents using 1.1.0 constructs require at least 1.1.0.
+- Documents using 1.2.0 constructs require at least 1.2.0.
+- Documents using 1.3.0 constructs require at least 1.3.0.
+- Documents using `RETURN_CHARACTER_TO_OWNER_HAND` require at least 1.4.0.
+- Documents using `RESTRICT_ATTACK_TARGETS` require at least 1.5.0.
+- Documents using multi-card `REST_CARD.selection` require at least 1.5.0.
+- Documents using `ON_OPPONENT_CHARACTER_KO` require at least 1.6.0.
+- Documents using `scale` require at least 1.7.0.
+- Documents using `count_groups` require at least 1.8.0.
+- Documents using `PREVENT_ATTACK` require at least 1.8.0.
+- Documents using `UNTIL_END_OF_NEXT_TURN` require at least 1.8.0.
+- A compiler may support multiple versions but must not silently reinterpret them.
+- Unknown keys are rejected except scalar values in `[editorial.extra]`.
+- Incompatible changes to structure, types, enumerations, or meanings require a new major version.
+- Compatible additive extensions require a new minor version.
+- Non-semantic textual corrections may receive a patch release without changing language version.
+- Any change to construct meaning requires a new version.
+- Unsupported versions must be rejected.
+
+The additions in 1.6.0 were:
+
+1. `ON_OPPONENT_CHARACTER_KO`, a distinct Auto Effect timing.
+2. Explicit distinction between a source's own K.O. and an opponent Character's K.O.
+3. `EVENT_OBJECT` semantics for the opponent Character that fulfilled the new timing.
+4. Contextual `YOU`/`OPPONENT` resolution relative to the source controller at event occurrence.
+5. Event-time activation-condition evaluation.
+6. Preservation of the relevant event state, consistent with the OP01-061 FAQ.
+7. Validation, referential, and semantic rules for the extension.
+8. OP01-061 as a normative reference example.
+
+The additions in 1.7.0 were:
+
+1. `scale`, a numeric Value form multiplying supported dynamic counts by a positive integer.
+2. Explicit count-source restrictions and exact numeric evaluation.
+3. Dynamic recalculation of scaled values in continuous effects.
+
+The additions in 1.8.0 are additive:
+
+1. `count_groups`, calculating complete groups through restricted integer floor division.
+2. Integration of `count_groups` with `scale`.
+3. Explicit `TYPE` membership semantics for `PROPERTY_COMPARE` with `EQ`.
+4. `PREVENT_ATTACK` as a narrowly defined resolution operation.
+5. `PREVENT_ATTACK` as a narrowly defined continuous-effect kind.
+6. `UNTIL_END_OF_NEXT_TURN`, with a retained player reference and official expiration timing.
+7. Structural, referential, semantic, and normative validation for these extensions.
+8. OP01-083 and OP01-085 as reference examples.
+
+All existing 1.7.0 programs preserve their previous meanings.
+
+Documents using only earlier constructs may retain their declared language versions.
+
+Changes to structure or semantics require a new versioned specification, not silent reinterpretation.
+
 ## 26. Reference Examples
 
 Examples demonstrate structures and do not replace checking actual text, CR, FAQ, or errata.
 
 ### 26.1 Simple Permanent Effect
 
-```
+```toml
 [[abilities.effects]]
 id = "E1"
 category = "PERMANENT"
@@ -2337,7 +2583,7 @@ continuous = {
 
 ### 26.2 Ordered Auto Effect
 
-```
+```toml
 [[abilities.effects]]
 id = "E1"
 category = "AUTO"
@@ -2350,7 +2596,7 @@ resolution = [
 
 ### 26.3 Resolution Condition
 
-```
+```toml
 resolution = [
   { id = "S1", kind = "OPERATION", operation = "TRASH_HAND", player = { kind = "PLAYER", role = "YOU" }, selection = "S0" },
   { id = "S2", kind = "IF", condition = { test = "AREA_COUNT", area = "TRASH", player = { kind = "PLAYER", role = "YOU" }, operator = "GTE", value = { literal = 5 } }, steps = [
@@ -2365,7 +2611,7 @@ The Condition is evaluated when the IF step is reached, not frozen at the start 
 
 Non-Event Trigger:
 
-```
+```toml
 [[abilities]]
 id = "A1"
 source_text = "[Trigger] Draw 1 card."
@@ -2384,7 +2630,7 @@ resolution = [
 
 Event Trigger activating the card:
 
-```
+```toml
 event_activation = { window = "TRIGGER" }
 ```
 
@@ -2392,7 +2638,7 @@ The Event's normal effect remains a separate `ACTIVATE` with `EVENT_CARD_RESOLUT
 
 ### 26.5 Optional Life Payment
 
-```
+```toml
 activation_costs = [
   { kind = "ADD_LIFE_TO_HAND",
     payer = { kind = "PLAYER", role = "YOU" },
@@ -2406,7 +2652,7 @@ The payment is not damage or Trigger.
 
 ### 26.6 LOOK Remainder
 
-```
+```toml
 resolution = [
   { id = "S1", kind = "OPERATION", operation = "LOOK", area = { kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "DECK" }, player = { kind = "PLAYER", role = "YOU" }, quantity = { mode = "FIXED", value = { literal = 5 } } },
   { id = "S2", kind = "SELECT", object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "DECK" }], quantity = { mode = "UP_TO", maximum = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "LOOKED_BY_CHOOSER", information_step = "S1" },
@@ -2421,7 +2667,7 @@ REMAINDER identifies only the unselected cards from the earlier LOOK result that
 
 ### 26.7 Returning a Card to Its Owner
 
-```
+```toml
 { id = "S1", kind = "OPERATION", operation = "RETURN_CARD", selection = "S0", destination_area = { kind = "AREA", player = { kind = "PLAYER", role = "OWNER" }, name = "HAND" } }
 ```
 
@@ -2429,7 +2675,7 @@ The engine resolves the owner separately for each card.
 
 ### 26.8 Attack-Target Permission
 
-```
+```toml
 [[abilities.effects]]
 id = "E1"
 category = "PERMANENT"
@@ -2449,7 +2695,7 @@ This adds target eligibility. It does not grant Rush or override attack restrict
 
 ### 26.9 Battle K.O. Prevention
 
-```
+```toml
 [[abilities.effects]]
 id = "E1"
 category = "PERMANENT"
@@ -2513,7 +2759,7 @@ The payment is one `REST_CARD` entry with `FIXED 2`, not two independent optiona
 
 This card demonstrates the FCL 1.6.0 timing, event-time activation conditions, `EVENT_OBJECT`, `DON!! x1`, `[Your Turn]`, `[Once Per Turn]`, and `ADD_DON`.
 
-```
+```toml
 format = "FL_CARD_LANGUAGE"
 language_version = "1.6.0"
 
@@ -2586,9 +2832,81 @@ The official OP01-061 FAQ establishes that the `[DON!! x1]` condition must be sa
 
 This example does not require a separate `ERRATA` reference merely because the original API input contains an annotation claiming that the card has been errata'd. An actual applicable official correction must be independently established before an `ERRATA` reference or altered `current_text` is declared.
 
+### 26.13 OP01-083 — Mr.1 (Daz.Bonez)
+
+This card demonstrates counting complete groups of Events in Trash and scaling the result.
+
+```toml
+[[abilities.effects]]
+id = "E1"
+category = "PERMANENT"
+
+valid_when = { all = [
+  { test = "DON_GIVEN_TO_SOURCE", operator = "GTE", value = { literal = 1 } },
+  { test = "PLAYER_TURN", value = "YOUR_TURN" },
+  { test = "PROPERTY_COMPARE", subject = { kind = "TEXT_DESIGNATED_OBJECT", designation = "your Leader" }, property = "TYPE", operator = "EQ", value = { literal = "Baroque Works" } }
+] }
+
+[abilities.effects.continuous]
+kind = "MODIFY_POWER"
+subject = { kind = "SOURCE" }
+operator = "ADD"
+value = { scale = { count = { count_groups = { count = { count_objects = { object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "YOU" }, name = "TRASH" }], player = { kind = "PLAYER", role = "YOU" }, filter = { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "EVENT" } } } }, group_size = 2 } }, multiplier = 1000 } }
+```
+
+The example demonstrates:
+
+- Dynamic counting of Events in the player's Trash.
+- Complete groups of two, using integer floor division.
+- Multiplication of the resulting group count by 1000.
+- Continuous recalculation when the Trash changes.
+- `[DON!! x1]`, `[Your Turn]`, and Leader type conditions.
+
+Five Events produce two complete groups and therefore +2000 Power.
+
+### 26.14 OP01-085 — Mr.3 (Galdino)
+
+This card demonstrates conditional selection and temporary prevention of attack declarations.
+
+The example uses the current post-errata wording. Its FAQ establishes that if the effect resolves during the opponent's turn, the restriction expires at the end of that same turn.
+
+```toml
+[[source.references]]
+id = "OP01-085-FAQ"
+kind = "FAQ"
+document = "OFFICIAL_OP01_FAQ"
+section = "OP01-085"
+date = "2024-04-05"
+url = "https://en.onepiece-cardgame.com/pdf/qa_op01.pdf?20240405="
+
+[[abilities]]
+id = "A1"
+source_text = '''[On Play] If your Leader has the "Baroque Works" type, select up to 1 of your opponent's Characters with a cost of 4 or less. The selected Character cannot attack until the end of your opponent's next turn.'''
+status = "SUPPORTED"
+source_refs = ["OP01-085-FAQ"]
+
+[[abilities.effects]]
+id = "E1"
+category = "AUTO"
+timing = "ON_PLAY"
+effect_form = "ONE_SHOT"
+
+resolution = [
+  { id = "S1", kind = "IF", condition = { test = "PROPERTY_COMPARE", subject = { kind = "TEXT_DESIGNATED_OBJECT", designation = "your Leader" }, property = "TYPE", operator = "EQ", value = { literal = "Baroque Works" } }, steps = [
+    { id = "S2", kind = "SELECT", object = "CARD", areas = [{ kind = "AREA", player = { kind = "PLAYER", role = "OPPONENT" }, name = "CHARACTER_AREA" }], filter = { all = [
+      { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "CATEGORY", operator = "EQ", value = { literal = "CHARACTER" } },
+      { test = "PROPERTY_COMPARE", subject = { kind = "CANDIDATE" }, property = "COST", operator = "LTE", value = { literal = 4 } }
+    ] }, quantity = { mode = "UP_TO", maximum = { literal = 1 } }, chooser = { kind = "PLAYER", role = "YOU" }, information = "PUBLIC_INFORMATION" },
+    { id = "S3", kind = "OPERATION", operation = "PREVENT_ATTACK", selection = "S2", duration = { kind = "UNTIL_END_OF_NEXT_TURN", player = { kind = "PLAYER", role = "OPPONENT" } } }
+  ] }
+]
+```
+
+The selected Character instance cannot declare attacks while the restriction remains active. The restriction does not apply to a new instance created if that card leaves the Field and subsequently returns.
+
 ## 27. Conformance
 
-A document conforms to FCL when:
+A document conforms to FCL 1.8.0 when:
 
 1. It is valid TOML 1.0.0.
 2. It declares `format = "FL_CARD_LANGUAGE"` and an explicitly supported `language_version`.
@@ -2603,6 +2921,10 @@ A document conforms to FCL when:
 11. Every multi-card `REST_CARD.selection` follows §§17.2 and 17.3.
 12. Every `ON_OPPONENT_CHARACTER_KO` declaration and associated `EVENT_OBJECT` usage follows §§11.1, 12, and 14.
 13. Every `scale` expression follows the count-source, multiplier, numeric-value, and evaluation rules of §13.
+14. Every `count_groups` expression follows the integer-grouping rules of §13.
+15. Every `PREVENT_ATTACK` operation and continuous-effect declaration follows §§19 and 20.
+16. Every `UNTIL_END_OF_NEXT_TURN` duration follows §21, including player identity retention and expiration timing.
+17. Every TYPE membership comparison follows §12.1.
 
 `SUPPORTED` is a translation conclusion, not proof that the VM implements every game rule.
 
@@ -2724,7 +3046,7 @@ Event Trigger activation is different and does not create that timing.
 
 For `ON_OPPONENT_CHARACTER_KO`, the engine retains the exact event object, source-controller context, and event-time condition state. Event-time conditions must not be evaluated against later state changes.
 
-Trigger is offered only during official Life damage processing, instead of adding the card to Hand.
+Trigger is offered only during official Life damage processing, instead of adding the card to the Hand.
 
 If declined, normal processing continues. If accepted, the official Trigger procedure applies.
 
@@ -2818,14 +3140,17 @@ Continuous effects stabilize in Turn Player, then Non-Turn Player order, repeati
 
 Action prohibition, effect negation, and operation impossibility are different phenomena.
 
-FCL 1.6.0 does not provide arbitrary action prohibition, general effect negation, or unrestricted game-procedure modification.
+FCL 1.8.0 does not provide arbitrary action prohibition, general effect negation, or unrestricted game-procedure modification.
 
-Do not simulate those capabilities through Keyword removal or movement.
+`PREVENT_ATTACK` is a narrowly defined exception for attack-declaration prevention affecting explicitly identified Leader/Character instances or authorized continuous scopes. It does not establish generic action prohibition.
+
+Do not simulate these capabilities through Keyword removal or movement.
 
 The supported exceptions are:
 
 - `GRANT_ATTACK_TARGET_PERMISSION`: adds only the target eligibility described by its target scope.
 - `RESTRICT_ATTACK_TARGETS`: restricts the affected player's target choices to the described allowed set.
+- `PREVENT_ATTACK`: prevents only the attack declarations of the specified affected instances.
 - `PREVENT_BATTLE_KO`: prevents only the described battle K.O. consequence.
 
 These are not interchangeable and do not create generic rule modification.
@@ -2867,6 +3192,8 @@ The language does not provide generic control transfer, arbitrary effect copying
 
 `RESTRICT_ATTACK_TARGETS` only narrows legal targets. It does not cancel or redirect an attack.
 
+`PREVENT_ATTACK` prevents the affected card from declaring an attack. It does not prevent that card from being attacked or change attack-target eligibility.
+
 `PREVENT_BATTLE_KO` does not create immunity or negate effects.
 
 Blocker is not generic redirection; ending a battle is a consequence of the battle procedure.
@@ -2884,6 +3211,7 @@ Only the specific cases below are incorporated. Do not generalize them beyond th
 - OP01-051 errata: The February 17, 2023 correction changes the attack restriction from "any Character other than" to "any card other than the Character" with the specified name and changes `Play 1` to `Play up to 1`.
 - OP01-055: Characters played during the current turn may be rested for the payment. The Event may be activated without resting two Characters, but nothing happens.
 - OP01-061: The `[DON!! x1]` condition is checked when the opponent's Character is K.O.'d. If the Leader simultaneously loses the DON!! required by this condition, the Auto Effect does not activate. This is the normative basis for event-time condition evaluation under `ON_OPPONENT_CHARACTER_KO`.
+- OP01-085: If Mr.3 is played during the opponent's turn and its On Play effect resolves, "until the end of your opponent's next turn" expires at the end of that same turn.
 - OP11-010: A separate effect granting attacks against active Characters does not override the OP01-051 attack-target restriction.
 - EB05-006: Looking at the top Life card before a mode choice is permitted in the specific case addressed.
 - EB05-008: A Counter Effect with `up to 1` may activate when no Character is present.
@@ -2900,7 +3228,7 @@ Only the specific cases below are incorporated. Do not generalize them beyond th
 - EB05-010: Negation of printed, continuously granted, or Trigger-granted Blocker follows the specific FAQ treatment.
 - EB05-021: On Play of a Character played by an effect does not automatically chain into another On Play in the addressed case.
 
-OP01-021 establishes the specific additional-target permission. OP01-024 establishes the specific battle K.O. protection. OP01-051 and OP11-010 establish the specific attack-target restriction semantics and its interaction with added permissions. OP01-061 establishes the event-time condition requirement for the opponent Character K.O. timing.
+OP01-021 establishes the specific additional-target permission. OP01-024 establishes the specific battle K.O. protection. OP01-051 and OP11-010 establish the specific attack-target restriction semantics and its interaction with added permissions. OP01-061 establishes the event-time condition requirement for the opponent Character K.O. timing. OP01-085 establishes the specific expiration interpretation for its attack restriction.
 
 These cases do not create generic attack modification, immunity, negation, or procedure modification.
 
@@ -2909,6 +3237,36 @@ Unverified historical FAQs, complete errata reconciliation, collective replaceme
 A specific case requiring an unverified ruling must be `BLOCKED_NORMATIVE`.
 
 Collective replacement costs deliberately have no generic rule.
+
+## 30. Version 1.8.0 Extension
+
+FCL 1.8.0 extends the frozen 1.7.0 profile with count grouping, targeted attack prevention, and an additional turn-relative duration.
+
+The additions are:
+
+- `count_groups`, providing complete-group counting through integer floor division.
+- Integration of `count_groups` with `scale`.
+- Explicit membership semantics for `PROPERTY_COMPARE` with `TYPE` and `EQ`.
+- `PREVENT_ATTACK` as a resolution operation.
+- `PREVENT_ATTACK` as a continuous-effect kind.
+- `UNTIL_END_OF_NEXT_TURN`, retaining the specified player's identity.
+- Validation and conformance requirements for all new constructs.
+- OP01-083 and OP01-085 as reference examples.
+- OP01-085 FAQ integration for turn-relative expiration.
+
+The extension does not introduce:
+
+- General division or general-purpose arithmetic.
+- Arbitrary action prohibition.
+- Generic attack-rule modification.
+- Attack redirection or battle cancellation.
+- Arbitrary variables, functions, loops, or recursion.
+
+All previous language constructs preserve their original meanings.
+
+FCL 1.8.0 is ready for card-translation testing. It does not imply complete coverage of published cards or an implemented compiler and VM.
+
+The new capabilities must be implemented by a conforming compiler and execution engine before translated programs using them can execute.
 
 ## Official Normative References
 
@@ -2942,6 +3300,7 @@ Relevant entries:
 
 - February 17, 2023 — OP01-047 Trafalgar Law: changes its payment to return one of your Characters to its owner's Hand and changes `Play 1` to `Play up to 1`.
 - February 17, 2023 — OP01-051 Eustass"Captain"Kid: changes the attack restriction from other Characters to any other card except the specified Character and changes `Play 1` to `Play up to 1`.
+- February 17, 2023 — OP01-085 Mr.3 (Galdino): changes the selection from "select 1" to "select up to 1".
 
 The official corrected "After" text takes precedence over the original wording.
 
@@ -2959,13 +3318,8 @@ Relevant entries:
 - OP01-051 — multiple copies of the attack-target restriction.
 - OP01-055 — resting Characters played during the current turn and optional payment behavior.
 - OP01-061 — DON!! condition evaluation when the opponent's Character is K.O.'d.
+- OP01-085 — expiration of the attack restriction when the effect resolves during the opponent's turn.
 
 ### Official OP11 FAQ
 
 `https://en.onepiece-cardgame.com/pdf/qa_op11.pdf?20250523=`
-
-Relevant entry:
-
-\- OP11-010 — an additional attack-target permission does not override the OP01-051 restriction.
-
-These sources establish only the specific rules and FAQ interpretations listed. They do not certify that every published card, FAQ, erratum, printing, or interaction has been audited.
